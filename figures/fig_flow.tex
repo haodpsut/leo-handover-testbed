@@ -1,0 +1,56 @@
+% FLOW figure — testbed + method pipeline, Agentra house style, double-column.
+% Clean topology: single L->R spine on top; DAgger loop local under stage 3 with
+% forward arrow on the right and feedback arrow on the left (separated lanes);
+% evaluation hangs straight down. Vignette kept clear of the first card.
+\documentclass[tikz,border=3pt]{standalone}
+\usepackage{amsmath}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta,fit,backgrounds,calc}
+\def\ruleW{1.8pt}\def\cardStroke{0.6pt}\def\cardW{24mm}
+\input{../style/palette.tex}
+\tikzset{
+  every node/.append style={font=\small},
+  sub/.style={font=\scriptsize\itshape,text=g500},
+  sat/.style={circle,draw=forest,fill=white,line width=0.8pt,minimum size=3mm,inner sep=0pt},
+  usr/.style={regular polygon,regular polygon sides=3,draw=warm,fill=white,line width=1pt,minimum size=3.6mm,inner sep=0pt},
+}
+\begin{document}
+\begin{tikzpicture}[font=\small,>={Stealth[length=2.4mm]},node distance=6mm]
+
+% ===== vignette (far left, clearly separated from the first card) =====
+\node[sat] (a) at (0.35,2.7){};\node[sat] (b) at (0.95,2.95){};\node[sat] (c) at (1.5,2.65){};
+\node[usr] (u) at (0.95,1.9){};
+\draw[forest,line width=0.9pt,->](a)--(u);
+\draw[lime!72!forest,line width=0.9pt,dashed,->](b)--(u);
+\draw[g500,line width=0.7pt,dashed](c)--(u);
+\node[sub,anchor=south] at (0.95,3.15){LEO passes};
+
+% ===== TOP SPINE (single left-to-right, straight arrows) =====
+\node[card] (sim) at (3.6,2.5){Orbit sim\\\scriptsize SGP4/TLE};
+\node[card,right=of sim] (dp){DP offline\\\scriptsize optimum};
+\node[card,right=of dp] (dag){DAgger\\\scriptsize imitation};
+\node[dec,right=5mm of dag] (kan){KAN policy\\\scriptsize stay / HO};
+\node[card,right=5mm of kan] (out){Handover\\\scriptsize schedule};
+\ruleStage{sim}\ruleStage{dp}\ruleStage{dag}\ruleOut{out}
+\stepchip{sim}{1}\stepchip{dp}{2}\stepchip{dag}{3}
+\draw[data](sim)--(dp);\draw[data](dp)--(dag);\draw[data](dag)--(kan);\draw[data](kan)--(out);
+
+% ===== DAgger loop: forward (right lane) down, feedback (left lane) up =====
+\node[card,below=12mm of dag] (roll){Rollout\\\scriptsize current policy};
+\node[card,left=of roll] (relab){Expert relabel\\\scriptsize query DP};
+\draw[active] ([xshift=1.2mm]dag.south) -- ([xshift=1.2mm]roll.north);      % forward, right lane
+\draw[active] (roll) -- (relab);                                             % rollout -> relabel
+\draw[active] ([xshift=-1.2mm]relab.north) -- ++(0,0.9)                      % feedback, left lane
+      -| ([xshift=-1.2mm]dag.south);
+\node[sub] at ($(relab.north)!0.5!(dag.south)+(-0.9,0.55)$){aggregate};
+\begin{scope}[on background layer]
+\node[panel,fit=(relab)(roll),inner sep=7pt] (lp){};
+\end{scope}
+\paneltitle{lp}{DAgger loop (no reward)}
+
+% ===== evaluation: straight down from the output =====
+\node[card,below=12mm of out] (ev){Evaluate\\\scriptsize gap to optimum,\\\scriptsize ping-pong};
+\ruleAux{ev}
+\draw[data] (out) -- (ev);
+
+\end{tikzpicture}
+\end{document}

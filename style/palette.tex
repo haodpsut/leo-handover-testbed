@@ -1,0 +1,107 @@
+% palette.tex — Agentra house palette + style language for draw-figure-dph.
+% SINGLE SOURCE OF TRUTH. Figures must \input this, not re-declare colors.
+%
+% Identity: near-monochrome forest ink, agentra-green as the ONLY structural
+% color, ONE warm-orange highlight. NOT a 6-color rainbow.
+%
+% ROLE IS ENCODED TWICE: by hue AND by rule line-style. Hue alone fails in
+% grayscale (agreen luma 134, warm 142, g500 113 all collapse), so every role
+% rule also carries a distinct dash pattern. Never encode a role by hue alone.
+%
+% Required libs: positioning, shapes.geometric, arrows.meta, fit, backgrounds, calc
+
+% ---- brand colors ----
+\definecolor{forest}{HTML}{0C2F1F}  % ink: ALL text + strokes
+\definecolor{agreen}{HTML}{46B152}  % structural: stages, spine, badges
+\definecolor{lime}{HTML}{B3D335}    % secondary track (e.g. attacker/auxiliary pipeline)
+\definecolor{warm}{HTML}{D97742}    % the SINGLE warm highlight: decision + output/alert ONLY
+\definecolor{g500}{HTML}{6B7280}    % neutral parameter / aux
+\definecolor{g300}{HTML}{DADEE2}    % hairlines, group borders
+
+% ---- knobs. Defaults ARE the canonical house values (examples/ex3b-agentra-style).
+% Override by \def-ing BEFORE \input; only do so for slides.
+\providecommand{\ruleW}{1.6pt}      % role top-rule thickness   (slides: 2.4pt)
+\providecommand{\cardStroke}{0.5pt} % card border               (slides: 0.6pt)
+\providecommand{\cardW}{32mm}       % uniform card width; the diamond tracks it
+% The decision diamond's stroke and proportion live in knobs so the `dec` node and its
+% legend swatch \swDec cannot drift apart. \swDec used to hard-code aspect=1.6 and
+% 0.7pt (plus a minimum height, which overrides the aspect entirely), so the key showed
+% a visibly different diamond from the diamonds it was explaining.
+\providecommand{\decLW}{1.1pt}      % decision diamond stroke   (slides: 1.6pt)
+\providecommand{\decAspect}{2.2}    % decision diamond width:height
+\providecommand{\railW}{1.0pt}      % legacy (spine motif retired), kept for old files
+\providecommand{\badgeSz}{4.4mm}    % legacy (badge motif retired)
+
+% ---- style language: white cards, hairline forest border, role via TOP-RULE ----
+\tikzset{
+  card/.style={draw=forest,line width=\cardStroke,fill=white,text=forest,align=center,
+    rounded corners=1pt,inner sep=5pt,minimum height=10mm,minimum width=\cardW},
+  amod/.style={draw=forest,line width=\cardStroke,fill=white,text=forest,align=center,
+    rounded corners=1pt,inner sep=5pt,minimum height=10mm,minimum width=34mm},
+  % diamond width tracks \cardW so it stays in the same column grid as the cards
+  dec/.style ={diamond,aspect=\decAspect,draw=warm,line width=\decLW,fill=white,text=forest,
+    align=center,inner sep=1pt,minimum width=\cardW},
+  % panel: labeled region grouping one actor's blocks. Panels are what give the
+  % figure structure and density -- prefer them over a long vertical rail.
+  panel/.style ={draw=g300,line width=0.9pt,rounded corners=2pt,inner sep=6pt},
+  ptitle/.style={font=\scriptsize\bfseries,text=forest,inner sep=1.5pt,fill=white},
+  % step chip: small number sitting ON the role rule (replaces the old spine+badge motif)
+  % \scriptsize, never \tiny: at 10pt base \tiny is 5pt, which lands at 4.6-5.0pt once
+  % the artwork is placed. The step number is real information, not decoration.
+  chip/.style={circle,fill=agreen,text=white,font=\scriptsize\bfseries,
+    minimum size=4.4mm,inner sep=0pt},
+  badge/.style={circle,fill=agreen,draw=forest,line width=0.5pt,text=white,
+    font=\footnotesize\bfseries,minimum size=\badgeSz,inner sep=0pt},
+  data/.style  ={->,draw=forest,line width=0.8pt,shorten >=1mm,shorten <=1mm},
+  active/.style={->,draw=lime!72!forest,line width=1.2pt,dotted,shorten >=1mm},
+  param/.style ={->,draw=g500,line width=0.8pt,dashed,shorten >=1mm,shorten <=1mm},
+}
+
+% ---- ROLE RULES: hue + dash pattern (both channels). Use these, never a raw \draw. ----
+\newcommand{\ruleStage}[1]{% always-executed pipeline stage
+  \draw[agreen,line width=\ruleW] (#1.north west)--(#1.north east);}
+\newcommand{\ruleTrack}[1]{% secondary track (attacker / auxiliary pipeline)
+  \draw[lime!80!forest,line width=\ruleW,dash pattern=on 3.5pt off 2.2pt]
+    (#1.north west)--(#1.north east);}
+\newcommand{\ruleAux}[1]{% neutral parameter / constraint block
+  \draw[g500,line width=\ruleW,dash pattern=on 1pt off 2pt]
+    (#1.north west)--(#1.north east);}
+% A `double` stroke is 2*line width + double distance wide. Keep that TOTAL equal to
+% \ruleW, or the output rule renders ~2.6x heavier than the stage rules and its white
+% core erases the card's own top border.
+\providecommand{\ruleOutLW}{0.5pt}\providecommand{\ruleOutDD}{0.6pt} % DECK: 0.9pt / 0.8pt
+\newcommand{\ruleOut}[1]{% decision result / output / alert  (split bar = unmistakable in print)
+  \draw[warm,line width=\ruleOutLW,double,double distance=\ruleOutDD]
+    (#1.north west)--(#1.north east);}
+% ---- LEGEND SWATCHES: always build the key from these, never hand-draw it. ----
+% A hand-drawn key hard-codes widths/dash patterns and silently desynchronises from
+% the real rules the moment \ruleW (or the slide override) changes.
+\newcommand{\swStage}{\tikz\draw[agreen,line width=\ruleW](0,0)--(0.38,0);}
+\newcommand{\swTrack}{\tikz\draw[lime!80!forest,line width=\ruleW,
+  dash pattern=on 3.5pt off 2.2pt](0,0)--(0.38,0);}
+\newcommand{\swAux}{\tikz\draw[g500,line width=\ruleW,
+  dash pattern=on 1pt off 2pt](0,0)--(0.38,0);}
+\newcommand{\swOut}{\tikz\draw[warm,line width=\ruleOutLW,double,
+  double distance=\ruleOutDD](0,0)--(0.38,0);}
+\newcommand{\swData}{\tikz\draw[data,shorten >=0pt,shorten <=0pt](0,0)--(0.38,0);}
+\newcommand{\swActive}{\tikz\draw[active,shorten >=0pt](0,0)--(0.38,0);}
+\newcommand{\swParam}{\tikz\draw[param,shorten >=0pt,shorten <=0pt](0,0)--(0.38,0);}
+% A diamond with EMPTY text has zero natural height, so `aspect` alone leaves the
+% swatch a flat sliver: the height must be given. It is therefore COMPUTED from
+% \decAspect rather than hard-coded, so the swatch keeps the real node's proportion
+% (the old 5.5mm x 3mm at aspect=1.6 drew a 1.83 ratio against the node's 2.2).
+\providecommand{\swDecW}{5.5mm}
+\newcommand{\swDec}{\tikz{%
+  \pgfmathsetlengthmacro{\swDecH}{\swDecW/\decAspect}%
+  \node[draw=warm,line width=\decLW,fill=white,diamond,aspect=\decAspect,
+        minimum width=\swDecW,minimum height=\swDecH,inner sep=0pt]{};}}
+
+% step number sitting on the rule: \stepchip{node}{n}
+\newcommand{\stepchip}[2]{\node[chip] at ([xshift=5mm]#1.north west){#2};}
+% panel title: \paneltitle{panel node}{text}
+\newcommand{\paneltitle}[2]{\node[ptitle,anchor=west] at ([xshift=4mm]#1.north west){#2};}
+%
+% NOTE: do NOT name these \toprule — that collides with booktabs in a real paper preamble.
+% NOTE: never name a TikZ style `out`, `in`, `step`, `scale` — they shadow keys.
+% DECK intensity, before \input:
+%   \def\ruleW{2.6pt}\def\railW{1.8pt}\def\badgeSz{6.2mm}\def\cardStroke{0.6pt}\def\cardW{48mm}

@@ -1,0 +1,5 @@
+method,gap_mean,gap_std,pingpong_mean,macroF1_mean,params
+KAN,1.158,0.408,6.16,0.8532,65
+MLP,1.014,0.225,6.84,0.8517,211
+max-SINR,1.786,0.435,19.8,,
+max-elev,4.357,0.813,0.0,,

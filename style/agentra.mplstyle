@@ -1,0 +1,74 @@
+# agentra.mplstyle — result figures for IEEE Transactions, SINGLE COLUMN.
+# Designed to be placed at 1:1 (no LaTeX rescaling), so every size here is the
+# size that lands on paper. Single column = 3.5in = 252pt.
+
+# ---- canvas: single column, no rescale ----
+figure.figsize      : 3.5, 2.4
+figure.dpi          : 200
+savefig.dpi         : 600
+savefig.bbox        : tight
+savefig.pad_inches  : 0.02
+savefig.transparent : False
+
+# ---- type: match the paper body (IEEE = Times), 7-8pt floor ----
+font.family         : serif
+font.serif          : Times New Roman, DejaVu Serif
+mathtext.fontset    : stix
+font.size           : 8
+axes.labelsize      : 8
+axes.titlesize      : 8
+xtick.labelsize     : 7
+ytick.labelsize     : 7
+legend.fontsize     : 7
+
+# ---- frame: only left+bottom, hairline, ink colour ----
+axes.edgecolor      : "#0C2F1F"
+axes.linewidth      : 0.6
+axes.spines.top     : False
+axes.spines.right   : False
+axes.labelcolor     : "#0C2F1F"
+axes.titlelocation  : left
+axes.titlepad       : 3.0
+axes.labelpad       : 2.0
+
+# ---- background: white, hairline HORIZONTAL grid only ----
+figure.facecolor    : white
+axes.facecolor      : white
+axes.grid           : True
+axes.grid.axis      : y
+axes.axisbelow      : True
+grid.color          : "#DADEE2"
+grid.linewidth      : 0.4
+grid.linestyle      : -
+
+# ---- ticks: short, outward, muted labels ----
+xtick.color         : "#6B7280"
+ytick.color         : "#6B7280"
+xtick.labelcolor    : "#0C2F1F"
+ytick.labelcolor    : "#0C2F1F"
+xtick.direction     : out
+ytick.direction     : out
+xtick.major.size    : 2.0
+ytick.major.size    : 2.0
+xtick.major.width   : 0.6
+ytick.major.width   : 0.6
+xtick.minor.visible : False
+ytick.minor.visible : False
+
+# ---- data marks ----
+lines.linewidth     : 1.2
+lines.markersize    : 3.2
+lines.markeredgewidth : 0.6
+patch.linewidth     : 0.6
+
+# ---- legend: inside, no frame, compact ----
+legend.frameon      : False
+legend.handlelength : 1.9
+legend.handletextpad: 0.5
+legend.borderpad    : 0.2
+legend.labelspacing : 0.3
+legend.columnspacing: 1.0
+
+# ---- vector-safe output ----
+pdf.fonttype        : 42
+ps.fonttype         : 42
