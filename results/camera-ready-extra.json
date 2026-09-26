@@ -1,0 +1,41 @@
+{
+  "gia_rut_gon_pct": 0.17172919367809164,
+  "gia_rut_gon_sd": 0.0953338342662632,
+  "gia_rut_gon_max": 0.28101884107970754,
+  "vis_per_slot": 12.641666666666667,
+  "giao_thuc": "chinh tren seed 0-4, danh gia tren seed 5-9, gap so voi DP nhi phan",
+  "bang": [
+    {
+      "ten": "A3+TTT (tuned for gap), hys=2 dB TTT=1",
+      "hys": 2.0,
+      "ttt": 1,
+      "gap": 0.6253098601598486,
+      "pp": 6.4,
+      "ho": 47.6
+    },
+    {
+      "ten": "A3+TTT (tuned for p-p), hys=1 dB TTT=2",
+      "hys": 1.0,
+      "ttt": 2,
+      "gap": 9.052167540760616,
+      "pp": 0.0,
+      "ho": 16.4
+    },
+    {
+      "ten": "max-SINR",
+      "hys": null,
+      "ttt": null,
+      "gap": 1.7860947447839024,
+      "pp": 19.8,
+      "ho": 71.4
+    },
+    {
+      "ten": "max-elev",
+      "hys": null,
+      "ttt": null,
+      "gap": 4.356902110625059,
+      "pp": 0.0,
+      "ho": 25.0
+    }
+  ]
+}

@@ -99,3 +99,28 @@ the channel rather than in the geometry.
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+## Camera-ready additions (September 2026)
+
+`code/camera_ready_extra.py` reproduces the two measurements added for the camera-ready version
+in response to the reviewers, and writes `results/camera-ready-extra.json`.
+
+**Cost of the binary action space.** The paper reduces the per-slot decision to stay-or-switch
+toward the strongest challenger. The script re-solves the dynamic program over the *full*
+candidate set (every visible satellite plus an outage option) and reports the difference. With
+an average of 12.6 visible satellites per slot, the reduction costs 0.17% of the objective on
+average and 0.28% at worst.
+
+**3GPP A3 baseline.** A hysteresis plus time-to-trigger mechanism, tuned on the training
+realisations and evaluated on the held-out ones, against the same offline optimum the paper
+uses. The result does not favour the paper and is reported as found: the best configuration
+(h = 2 dB, TTT = 1) reaches a smaller gap than either learned policy at comparable stability.
+Its performance is highly parameter-sensitive, spanning 23.7 percentage points of gap across
+the 15-point grid.
+
+A positive control is built in: A3 with h = 0 and TTT = 1 must reproduce the strongest-signal
+baseline exactly, and the script asserts this before reporting anything.
+
+```bash
+python3 code/camera_ready_extra.py
+```
