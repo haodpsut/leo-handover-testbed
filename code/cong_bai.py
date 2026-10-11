@@ -162,6 +162,13 @@ def cham(tep=None):
         v = re.sub(r"\\label\{[^}]*\}|\\ref\{[^}]*\}|\\eqref\{[^}]*\}|%[^\n]*", "", nguon[p[0]])
         v = re.sub(r"\$[^$]*\$", "", v)                      # cong thuc duoc phep co so
         v = re.sub(r"\\(?:cite|citep)[a-z]*\{[^}]*\}", "", v)
+        # ⛔ BAO DONG GIA, sinh ra khi chuyen cac khoi float vao trong muc: `scale=1` cua
+        #    `\includegraphics` va cac tuy chon `[tb]` cua moi truong KHONG phai so trong
+        #    cau van, ma B6 van dem chung. Loai dung hai cau truc ay ra, chu KHONG ha phep
+        #    kiem: ca tiem "go mot chu so vao cau ket qua" van phai bi bat.
+        v = re.sub(r"\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}", "", v)
+        v = re.sub(r"\\(?:begin|end)\{\w+\*?\}(?:\[[^\]]*\])?", "", v)
+        v = re.sub(r"\\input\{[^}]*\}", "", v)
         so = re.findall(r"(?<![\w\\^{])\d+(?:\.\d+)?(?![\w}])", v)
         so = [s for s in so if s not in ("10", "6", "2")]    # 10^{-6}, so muc, so mu
         kiem(not so, "B6 %s khong go chu so tay" % ten,

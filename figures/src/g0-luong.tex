@@ -25,40 +25,46 @@
 %    goc, nen `$J^{\star}$` o 8pt rot xuong 5,6pt tren giay va cong bac dung. Luat NARROW
 %    cho phep day ky hieu xuong caption, va day la ly do no cho phep.
 \begin{document}
-% ⛔⛔ BAN TRUOC DAT NODE BANG `below=6mm of $(a)!0.5!(b)$`, tuc do 6mm tu MOT TOA DO chu
-%    khong tu MEP CARD, nen cac card DE LEN NHAU. `measure_figure` cho PASS (ink, aspect,
-%    co chu deu dat) vi no mu truoc va cham bo cuc. Chi mat nhin anh render moi thay. Nay
-%    dat tren LUOI TOA DO tuong minh, dung nhu template cua nha lam.
-%    Luoi: hai cot x = 0 va 5.2cm, cardW 31mm, nen artwork ~252pt = dung kho cac hinh
-%    ket qua, va ca bo hinh cua bai dat cung mot be rong.
+% ⛔⛔ BAN TRUOC SAI LUONG, khong phai sai tham my, va toi chi thay khi doc lai mui ten canh
+%    cong thuc:
+%    1. Mui ten DUY NHAT vao `optimality gap` la tu `policies`. Nhung G = (J(pi) - J*)/|J*|
+%       CAN J*, tuc toi uu DAY DU. Hinh noi dai luong trung tam cua bai tinh duoc ma khong
+%       can toi uu nao. Nay `optimum, full choice` -> `gap` la mot mui ten that.
+%    2. `optimum binary -> policies` ve NET LIEN, tuc noi chinh sach SINH RA tu toi uu nhi
+%       phan. Sai: A3 la quy tac chuan, khong can toi uu nao; chi KAN/MLP lay no lam dich
+%       bat chuoc. Nay no la mui ten `param` (net dut) va CO NHAN noi ro no huan luyen cai gi.
+%    3. Khong co mui ten nao cho thay chinh sach an dai luong tung khe, du chung co. Nay co,
+%       va no di theo HANH LANG TRONG giua hai card toi uu, nen vua dung vua khong cat gi.
+%
+% Luoi: hai cot x = 0 va 5.2cm, cardW 31mm => artwork ~252pt, bang cac hinh ket qua.
+% Hang cach 1.9cm de card khong cham nhau va de mui ten co cho tho.
 \begin{tikzpicture}[font=\sffamily\footnotesize,>={Stealth[length=2.0mm]}]
 
-% ===== hang 0: cai duoc CHO =====
+% ===== hang 1: cai duoc CHO =====
 \node[card] (inst) at (0,0)    {instance\\\scriptsize SGP4 orbits,\\\scriptsize seeded fading};
 \node[card] (reg)  at (5.2,0)  {regime\\\scriptsize five axes,\\\scriptsize 80-cell slice};
 
-% ===== hang 1: dai luong tung khe =====
+% ===== hang 2: dai luong tung khe. MOI thu phia duoi deu an tu day. =====
 \node[card] (sc)   at (2.6,-1.7) {per-slot\\\scriptsize vis., quality};
 
-% ===== hang 2: HAI toi uu chinh xac. Khac nhau DUY NHAT o khong gian hanh dong. =====
-\node[card] (dpf)  at (0,-3.4)   {optimum,\\\scriptsize full choice};
-\node[card] (dpb)  at (5.2,-3.4) {optimum,\\\scriptsize binary choice};
+% ===== hang 3: HAI toi uu chinh xac. Khac nhau DUY NHAT o khong gian hanh dong. =====
+\node[card] (dpf)  at (0,-3.4)   {optimum,\\\scriptsize full choice\\\scriptsize exact DP};
+\node[card] (dpb)  at (5.2,-3.4) {optimum,\\\scriptsize binary choice\\\scriptsize exact DP};
 
-% ===== hang 3: san do tu hai toi uu | cac chinh sach, deu bi nhot o khong gian nhi phan =====
-\node[card] (floor) at (0,-5.15)   {action-space\\floor};
-\node[card] (pol)   at (5.2,-5.15) {policies\\\scriptsize A3 grid, 15 settings,\\\scriptsize KAN and MLP};
+% ===== hang 4: co che duoc DO. A3 khong can toi uu nao. =====
+\node[card] (pol)  at (2.6,-5.25) {policies\\\scriptsize A3 grid, 15 settings,\\\scriptsize KAN and MLP};
 
-% ===== hang 4: khoang cach cua tung chinh sach =====
-\node[card] (gap)   at (5.2,-6.9) {optimality\\gap};
+% ===== hang 5: hai phep do =====
+\node[card] (gap)   at (0,-7.05)   {optimality\\gap\\\scriptsize policy vs.\ full};
+% ⛔ `floor` phu thuoc CA HAI toi uu. Ve duong cheo tu `dpf` sang day thi cat qua
+%    `policies` va `gap`. Nen: mui ten THANG DUNG tu toi uu nhi phan (cung cot), con
+%    phu thuoc con lai noi bang CHU trong chinh card. Khong mui ten nao noi sai, khong
+%    duong nao cat nhau.
+\node[card] (floor) at (5.2,-7.05) {action-space\\floor\\\scriptsize binary vs.\ full};
 
-% ===== hang 5: ket qua =====
-\node[card] (surf)  at (2.6,-8.65) {decomposition\\\scriptsize gap $=$ floor $+$ residual};
+% ===== hang 6: ket qua =====
+\node[card] (surf)  at (2.6,-8.95) {decomposition\\\scriptsize gap $=$ floor $+$ residual};
 
-% ⛔⛔ TOI DA THEM PANEL THU HAI "what is reported" quanh (floor)(gap)(surf) de chua loi
-%    TOO SPARSE. Nhin anh render moi thay no NUOT NHAM card `policies` nam giua hai cot,
-%    tuc khung noi mot dieu SAI: chinh sach khong phai thu duoc bao. Mot khung sai nghia
-%    te hon mot hinh thua cho trong. Bo no, va bu mat do bang NOI DUNG THAT (con so quy mo
-%    tren hai card), dung nhu cong goi y: "add real content".
 \begin{scope}[on background layer]
   \node[panel, fit=(dpf)(dpb)] (pn) {};
 \end{scope}
@@ -66,28 +72,35 @@
 
 \ruleAux{inst}\ruleAux{reg}
 \ruleStage{sc}\ruleStage{dpf}\ruleStage{dpb}\ruleStage{pol}
-\ruleOut{floor}\ruleOut{gap}\ruleOut{surf}
+\ruleOut{gap}\ruleOut{floor}\ruleOut{surf}
 
 \stepchip{sc}{1}\stepchip{dpf}{2}\stepchip{dpb}{2}\stepchip{pol}{3}
-\stepchip{floor}{4}\stepchip{gap}{4}\stepchip{surf}{5}
+\stepchip{gap}{4}\stepchip{floor}{4}\stepchip{surf}{5}
 
+% cai duoc cho -> dai luong tung khe
 \draw[data] (inst.south) -- (sc.north west);
 \draw[data] (reg.south)  -- (sc.north east);
-\draw[data] (sc.south)   -- (dpf.north);
-\draw[data] (sc.south)   -- (dpb.north);
-\draw[data] (dpf.south)  -- (floor.north);
-\draw[data] (dpb.south west) -- (floor.north east);
-\draw[data] (dpb.south)  -- (pol.north);
-\draw[data] (pol.south)  -- (gap.north);
-\draw[data] (floor.south) -- (surf.north west);
-\draw[data] (gap.south)   -- (surf.north east);
+% dai luong tung khe -> HAI toi uu, VA -> cac chinh sach (hanh lang trong o giua)
+\draw[data] (sc.south) -- (dpf.north);
+\draw[data] (sc.south) -- (dpb.north);
+\draw[data] (sc.south) -- (pol.north);
+% dich BAT CHUOC: chi cho chinh sach hoc, nen net dut va co nhan
+% ⛔ Ban truoc co nhan noi tuyen "trains KAN, MLP" nam DE len chinh mui ten va tran ra
+%    ngoai card. Khong co cho dat no cho sach o kho 252pt, nen y nghia chuyen xuong CHU
+%    GIAI, chuong mot dong, va hinh het mot cho chu chong chu.
+\draw[param] (dpb.south west) -- (pol.north east);
+% khoang cach do so voi toi uu DAY DU; san do tu CA HAI toi uu
+\draw[data] (dpf.south)      -- (gap.north);
+\draw[data] (pol.south west) -- (gap.north east);
+\draw[data] (dpb.south)      -- (floor.north);
+% hai phep do -> phan ra
+\draw[data] (gap.south)   -- (surf.north west);
+\draw[data] (floor.south) -- (surf.north east);
 
-% Chu giai dung TU SWATCH cua nha, khong ve tay.
-% ⛔ Dat o GOC DUOI-TRAI chu khong o duoi cung: do dung la o cong do thua nhat (3,8% muc,
-%    can bang goc 2,5x). Chu giai la noi dung that, nen lap cho trong bang no thi vua chua
-%    loi mat do vua khong phai bia them gi.
-\node[font=\scriptsize, align=left, text=forest, anchor=north west] at (-1.75,-7.55)
+% Chu giai o GOC DUOI-TRAI: do la o thua nhat, nen lap no bang noi dung that.
+\node[font=\scriptsize, align=left, text=forest, anchor=north west] at (-1.75,-8.35)
   {\swAux\,given\\[2pt]\swStage\,solved exactly\\[2pt]
-   \swOut\,measured\\[2pt]\swData\,value flow};
+   \swOut\,measured\\[2pt]\swData\,value flow\\[2pt]
+   \swParam\,trains the\\\hphantom{\swParam\,}learned policies};
 \end{tikzpicture}
 \end{document}
