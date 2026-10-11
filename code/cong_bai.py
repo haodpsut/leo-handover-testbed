@@ -267,6 +267,35 @@ def cham(tep=None):
          "khong dan: %s" % sorted(nalg - ralg) if nalg - ralg else "%d/%d" % (len(nalg), len(nalg)))
     kiem(len(nalg) >= 1, "B14b bai co hop thuat toan", "%d hop" % len(nalg))
 
+    # ⛔⛔ THU TU NAY QUAN TRONG, va phep tiem day no ra. B17 (chay lai bo sinh) PHAI dung
+    #    TRUOC B16 (soi hinh tren dia). Ban dau nguoc lai, nen khi tiem loi `\%` vao bo sinh
+    #    thi B16 doc cac PDF CU con sach va bao DAT, roi B17 moi ve lai hinh hong. Cong logic
+    #    dung ma cham ban dung CU: lop loi 32 cua so nha, lap lai y nguyen o day.
+    # ---- B17 bo sinh hinh phai CHAY SACH ----
+    # ⛔ Day la phep kiem bat duoc lop loi "hinh ve THIEU DIEM ma khong ai bao": `f_truc` nay
+    #    tra False khi mot khoa che do khong khop, va bo sinh thoat ma 1. Mot hinh ve 2 tren 5
+    #    diem da loi toi ban gui doc ngoai vi khong co cong nao chay lai bo sinh.
+    _r = subprocess.run([sys.executable, os.path.join(HERE, "sinh_hinh_bang.py")],
+                        capture_output=True, text=True)
+    _d = [l for l in _r.stdout.splitlines() if "hinh dat" in l]
+    kiem(_r.returncode == 0, "B17 bo sinh hinh chay sach",
+         (_d[-1].strip() if _d else "ma tra ve %d" % _r.returncode))
+
+    # ---- B16 KHONG `\%` literal trong HINH ----
+    # ⛔ usetex TAT, nen `"gap (\\%)"` trong matplotlib in ra DAU GACH CHEO tren giay. Ba hinh
+    #    da di toi tan ban gui doc ngoai voi loi nay, va `measure_plot` khong bat vi no do co
+    #    chu chu khong doc chu. Hao bat bang mat.
+    import fitz as _f
+    xau_pc = []
+    for q in sorted(glob.glob(os.path.join(GOC, "figures", "*.pdf"))):
+        _d = _f.open(q)
+        if "\\%" in "\n".join(_d[i].get_text() for i in range(_d.page_count)):
+            xau_pc.append(os.path.basename(q))
+        _d.close()
+    kiem(not xau_pc, "B16 khong dau gach cheo truoc % trong hinh",
+         "co: %s" % xau_pc if xau_pc else "%d hinh sach"
+         % len(glob.glob(os.path.join(GOC, "figures", "*.pdf"))))
+
     # ---- B15 khong hien vat nao chi ton tai mot noi ----
     # Mot bang sinh ra ma main.tex khong \input la mot bang chet; cong phai thay.
     import glob as _g
@@ -325,6 +354,12 @@ def tu_kiem():
         ("B11: bo eqref duy nhat cua eq:branch",
          lambda: doi(st_, r"the bound \eqref{eq:branch} turns",
                      r"the branching bound turns")),
+        # ⛔ HAI CA NAY tai hien DUNG hai loi Hao bat bang mat ngay 11/10, va chung tiem vao
+        #    BO SINH chu khong vao ban thao, vi do la noi loi that da nam.
+        ("B17: lam mot khoa che do sai chinh ta trong bo sinh",
+         None),
+        ("B16: tra lai `\\%` literal trong nhan hinh",
+         None),
         ("B2: tiem mot \\ref treo",
          lambda: doi(kq, r"Table~\ref{tab:dai}", r"Table~\ref{tab:khong-co}")),
     ]
@@ -332,8 +367,29 @@ def tu_kiem():
     if cham(goc):
         sys.exit("⛔ ban GOC da hong, khong tiem duoc")
     hong = []
+    bs = os.path.join(HERE, "sinh_hinh_bang.py")
+    ma_goc = doc(bs)
+    tiem_ma = {
+        "B17: lam mot khoa che do sai chinh ta trong bo sinh":
+            ('lambda v: K(lam3=float(v))', 'lambda v: "lam3=%g" % v'),
+        "B16: tra lai `\\%` literal trong nhan hinh":
+            ('ax.set_ylabel("optimality gap (%)")', 'ax.set_ylabel("optimality gap (\\\\%)")'),
+    }
     for ten, f in ca:
         print("\n== %s ==" % ten)
+        if ten in tiem_ma:
+            cu, moi = tiem_ma[ten]
+            assert cu in ma_goc, "⛔ ca tiem khong khop ma: %s" % cu[:40]
+            io.open(bs, "w", encoding="utf-8").write(ma_goc.replace(cu, moi, 1))
+            try:
+                l = cham()
+            finally:
+                io.open(bs, "w", encoding="utf-8").write(ma_goc)
+                subprocess.run([sys.executable, bs], capture_output=True, text=True)
+            print("  => %s" % ("cong BAT duoc" if l else "⛔ cong KHONG bat"))
+            if not l:
+                hong.append(ten)
+            continue
         l = cham(f())
         print("  => %s" % ("cong BAT duoc" if l else "⛔ cong KHONG bat"))
         if not l:

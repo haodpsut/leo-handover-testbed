@@ -55,6 +55,81 @@ HYS = [0.0, 1.0, 2.0, 3.0, 4.0]
 TTT = [1, 2, 3]
 A3 = ["a3_%g_%d" % (h, t) for h, t in itertools.product(HYS, TTT)]
 W1 = 3.5          # một cột, inch. `measure_plot` đòi 252 pt ±6%
+
+# ⛔ LUẬT NHÀ (G5 nhánh B): heatmap ĐƠN SẮC trắng→agreen. KHÔNG viridis, KHÔNG jet, KHÔNG
+#    YlOrRd. Tôi đã vi phạm cả ba ở bản đầu. Bản đồ hai phía thì hai kênh brand quanh trắng.
+from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm   # noqa: E402
+CMAP_DON = LinearSegmentedColormap.from_list("wag", ["#FFFFFF", ap.AGREEN])
+CMAP_HAI = LinearSegmentedColormap.from_list("gwa", [ap.AGREEN, "#FFFFFF", ap.WARM])
+
+
+def K(**kw):
+    """Khoá chế độ, ỦY QUYỀN cho `ten_che_do`, nguồn DUY NHẤT của tên chế độ.
+
+    ⛔⛔ ĐÂY LÀ LỖI ĐÃ CẮN HAI LẦN, lần hai làm HỎNG MỘT HÌNH TRONG BÀI. Tự dựng khoá bằng
+    `"lam3=%g" % 1.0` ra `lam3=1`, còn tên thật là `lam3=1.0`. Lần đầu nó làm sai một macro và
+    tôi vá ở `sinh_macro`; lần hai nó sống sót ở `main()` nên Hình 3 chỉ vẽ **2 trên 5 điểm**
+    của trục giá chuyển giao, trong khi §Results nói "λ3 từ 0,25 lên 4". Không cổng nào bắt,
+    Hảo bắt bằng mắt. Nay mọi chỗ phải đi qua hàm này.
+    """
+    return ten_che_do(kw)
+
+
+def bo_cot_suy_bien(a3, vi, gh):
+    """Bỏ các cột vĩ độ SUY BIẾN khỏi lát 2D, và nói rõ bỏ cái gì.
+
+    ⛔⛔ ĐO ĐƯỢC: ở vĩ độ 75 độ, vỏ Walker 53 độ để lại **0,000 vệ tinh nhìn thấy mỗi khe** và
+    người dùng mất liên lạc **120/120 khe**. Không có một quyết định nào tồn tại ở đó, nên mọi
+    chính sách trùng nhau và khoảng cách không có nghĩa. Bộ quét chính sách học đã tự loại 8 ô
+    ấy (nó không có điểm huấn luyện nào), nhưng hai hình nhiệt A3 vẫn vẽ chúng, nên BA hình của
+    cùng một lát đang nói hai cỡ lưới khác nhau: 88 và 80. Đó là lỗi nhất quán giữa các hình,
+    thứ chỉ lộ khi nhìn cả bộ. Nay cả ba cùng bỏ, và bài phải khai.
+    """
+    giu, bo = [], []
+    for v in vi:
+        vs = [a3[c]["vis"] for c in (("vido=%g+lam3=%g" % (v, g)) for g in gh) if c in a3]
+        (bo if (vs and max(vs) < 1e-9) else giu).append(v)
+    if bo:
+        print("       bo %d cot vi do SUY BIEN (0 ve tinh nhin thay): %s"
+              % (len(bo), ", ".join("%g" % v for v in bo)))
+    return giu, bo
+
+
+def nhan_thua(ax, vi):
+    """Nhãn trục x THƯA cho lát 2D: 11 nhãn sát nhau thì chữ chồng chữ, mắt đọc không ra."""
+    chon = [v for v in vi if v % 20 == 0] or vi
+    if vi and vi[-1] not in chon:
+        chon = chon + [vi[-1]]
+    ax.set_xticks(chon); ax.set_xticklabels(["%g" % v for v in chon])
+
+
+def o_nhiet(ax, X, Y, M, cmap, norm=None):
+    """Vẽ một bản đồ nhiệt theo đúng luật nhà, và đó là lý do nó là một hàm riêng.
+
+    ⛔ `agentra.mplstyle` bật `axes.grid` theo trục y, nên với heatmap đường lưới rơi ĐÚNG
+    TÂM HÀNG, tức cắt ngang qua con số trong ô. Hảo nhìn thấy ngay ở Hình 6. `measure_plot`
+    không bắt được vì đây là va chạm bố cục, không phải cỡ chữ hay khổ. Luật nhà: `grid(False)`
+    + `tick_params(length=0)` + phân ô bằng đường trắng ở RANH GIỚI chứ không ở tâm.
+    """
+    im = ax.pcolormesh(X, Y, M, shading="nearest", cmap=cmap, norm=norm,
+                       edgecolors="white", linewidth=0.6)
+    ax.grid(False)
+    ax.tick_params(length=0)
+    return im
+
+
+def so_trong_o(ax, xs, ys, M, dinh="%.1f", nguong=0.66):
+    # ⛔ Nguong 0,55 cho o "14.2" chu TRANG tren nen xanh TRUNG: doc duoc nhung sat men.
+    #    Nang len 0,66 de chi o THAT SU dam moi dung chu trang.
+    """Số trong ô, màu chữ theo độ đậm nền để luôn đủ tương phản."""
+    lo, hi = np.nanmin(M), np.nanmax(M)
+    for i, y in enumerate(ys):
+        for j, x in enumerate(xs):
+            if np.isnan(M[i, j]):
+                continue
+            t_ = (M[i, j] - lo) / (hi - lo) if hi > lo else 0.0
+            ax.text(x, y, dinh % M[i, j], ha="center", va="center", fontsize=7,
+                    color=("white" if t_ > nguong else ap.INK))
 SINH = "%% SINH TU DONG boi code/sinh_hinh_bang.py. KHONG sua tay.\n"
 
 
@@ -145,10 +220,15 @@ def luu(fig, ten, hai_cot=False):
 def f_truc(a3, cs, truc, xs, nhan_x, ten_tep, log_x=False):
     """Khoảng cách theo MỘT trục, kèm phân rã và hai chính sách học."""
     cd = [truc(v) for v in xs]
-    co = [c for c in cd if c in a3]
-    if len(co) < 2:
-        print("  bo qua %s: chi %d diem" % (ten_tep, len(co)))
+    thieu = [(v, c) for v, c in zip(xs, cd) if c not in a3]
+    # ⛔⛔ BẢN ĐẦU CHỈ KIỂM `len(co) < 2` rồi vẽ tiếp. Nên khi 3 trên 5 khoá sai chính tả,
+    #    nó vẽ một đường HAI ĐIỂM và không ai biết. Một hình thiếu điểm là một hình SAI,
+    #    không phải một hình nhỏ hơn. Nay thiếu một điểm là HỎNG, và in ra thiếu cái gì.
+    if thieu:
+        print("  ⛔ %s: THIEU %d/%d diem tren truc: %s"
+              % (ten_tep, len(thieu), len(xs), [c for _, c in thieu]))
         return False
+    co = cd
     x = [v for v, c in zip(xs, cd) if c in a3]
     gia = [a3[c]["gia"] for c in co]
     gap = [a3[c]["gap"] for c in co]
@@ -160,16 +240,24 @@ def f_truc(a3, cs, truc, xs, nhan_x, ten_tep, log_x=False):
         if cs and all(c in cs and ten in cs[c] for c in co):
             ax.plot(x, [cs[c][ten] for c in co], label=ten, **ap.sty(ten))
     ax.plot(x, [a3[c]["msinr"] for c in co], label="max-SINR", **ap.sty("max-SINR"))
+    # ⛔⛔ NHAN TRUC PHAI LA GIA TRI DA QUET, khong phai tick tu dong cua matplotlib. Ban dau
+    #    hinh mat do ghi 7.5, 10.0, 12.5 ... trong khi CHI chay 6, 9, 12, 15, 18, 24; hinh pha
+    #    dinh ghi 3 va 5 la hai muc CHUA HE CHAY. Mot nguoi doc khong the biet diem nao la so
+    #    do va diem nao la noi suy, va do la mot loi noi dung chu khong phai tham my.
     if log_x:
-        # ⛔ `set_xscale("log")` sinh nhan dang `10^{0}`, va so mu mathtext ve o ~70% co chu
-        #    nen ra 4,9pt, duoi san 7,0pt. Dat nhan TUONG MINH thi khong co so mu nao.
+        # `set_xscale("log")` sinh nhan `10^{0}`: so mu mathtext ve o ~70% co chu nen ra 4,9pt,
+        # duoi san 7,0pt. Dat nhan TUONG MINH thi khong co so mu nao.
         ax.set_xscale("log")
-        ax.set_xticks(x)
-        ax.set_xticklabels([("%g" % v) for v in x])
         ax.minorticks_off()
+    ax.set_xticks(x)
+    ax.set_xticklabels([("%g" % v) for v in x])
     ax.set_xlabel(nhan_x)
-    ax.set_ylabel("optimality gap (\\%)")
-    ax.legend(frameon=False, fontsize=7, loc="upper left")
+    ax.set_ylabel("optimality gap (%)")
+    # ⛔ Legend ĐẶT TRONG khung đè lên chính các đường nó chú thích (Hảo thấy ở Hình 3).
+    #    Luật nhà: dời RA NGOÀI, hàng ngang TRÊN trục, và bỏ khung.
+    ax.legend(frameon=False, fontsize=7, loc="lower center",
+              bbox_to_anchor=(0.5, 1.0), ncol=3, borderaxespad=0.0,
+              handlelength=1.6, columnspacing=1.1)
     return luu(fig, ten_tep)
 
 
@@ -180,24 +268,21 @@ def f_luoi_a3(hang, ten_tep):
         print("  bo qua %s: khong co che do neo" % ten_tep)
         return False
     m = np.full((len(TTT), len(HYS)), np.nan)
-    for i, t in enumerate(TTT):
+    for i, t_ in enumerate(TTT):
         for j, h in enumerate(HYS):
-            v = [float(x["gap_pct"]) for x in te if x["chinh_sach"] == "a3_%g_%d" % (h, t)]
+            v = [float(x["gap_pct"]) for x in te if x["chinh_sach"] == "a3_%g_%d" % (h, t_)]
             if v:
                 m[i, j] = st.mean(v)
+    if np.isnan(m).any():
+        print("  ⛔ %s: thieu %d o tren luoi" % (ten_tep, int(np.isnan(m).sum())))
+        return False
     fig, ax = plt.subplots(figsize=(W1, 2.0), constrained_layout=True)
-    im = ax.imshow(m, aspect="auto", origin="lower", cmap="YlOrRd")
-    ax.set_xticks(range(len(HYS))); ax.set_xticklabels(["%g" % h for h in HYS])
-    ax.set_yticks(range(len(TTT))); ax.set_yticklabels([str(t) for t in TTT])
+    im = o_nhiet(ax, HYS, TTT, m, CMAP_DON)
+    ax.set_xticks(HYS); ax.set_xticklabels(["%g" % h for h in HYS])
+    ax.set_yticks(TTT); ax.set_yticklabels([str(x) for x in TTT])
     ax.set_xlabel("hysteresis (dB)"); ax.set_ylabel("time-to-trigger (slots)")
-    for i in range(len(TTT)):
-        for j in range(len(HYS)):
-            if not np.isnan(m[i, j]):
-                # ⛔ fontsize=6 ra 6,1pt tren giay, duoi san 7,0pt cua `measure_plot`.
-                #    San ay khong phai so tron tay: duoi no thi chu khong doc duoc khi in.
-                ax.text(j, i, "%.1f" % m[i, j], ha="center", va="center", fontsize=7,
-                        color=("white" if m[i, j] > np.nanmax(m) * 0.6 else ap.INK))
-    fig.colorbar(im, ax=ax, label="gap (\\%)")
+    so_trong_o(ax, HYS, TTT, m)
+    fig.colorbar(im, ax=ax, label="gap (%)")
     return luu(fig, ten_tep)
 
 
@@ -211,6 +296,7 @@ def f_mat2d(hang, ten_tep):
         p = dict(kv.split("=") for kv in cd.split("+"))
         vi.add(float(p["vido"])); gh.add(float(p["lam3"]))
     vi, gh = sorted(vi), sorted(gh)
+    vi, _bo = bo_cot_suy_bien(a3, vi, gh)
     if len(vi) < 2 or len(gh) < 2:
         print("  bo qua %s" % ten_tep)
         return False
@@ -221,11 +307,13 @@ def f_mat2d(hang, ten_tep):
             if cd in a3:
                 m[i, j] = a3[cd]["gap"]
     fig, ax = plt.subplots(figsize=(W1, 2.3), constrained_layout=True)
-    im = ax.pcolormesh(vi, gh, m, shading="nearest", cmap="YlOrRd")
+    im = o_nhiet(ax, vi, gh, m, CMAP_DON)
     ax.set_yscale("log")
+    ax.set_yticks(gh); ax.set_yticklabels([("%g" % v) for v in gh]); ax.minorticks_off()
+    nhan_thua(ax, vi)
     ax.set_xlabel("ground-station latitude (deg)")
     ax.set_ylabel("handover cost $\\lambda_3$")
-    fig.colorbar(im, ax=ax, label="A3 gap (\\%)")
+    fig.colorbar(im, ax=ax, label="A3 gap (%)")
     return luu(fig, ten_tep)
 
 
@@ -245,6 +333,7 @@ def f_ban_do_che_do(hang_a3, hang_cs, ten_tep):
             q = dict(kv.split("=") for kv in cd.split("+"))
             vi.add(float(q["vido"])); gh.add(float(q["lam3"]))
     vi, gh = sorted(vi), sorted(gh)
+    vi, _bo = bo_cot_suy_bien(a3, vi, gh)
     if len(vi) < 2 or len(gh) < 2:
         print("  bo qua %s" % ten_tep)
         return False
@@ -263,12 +352,24 @@ def f_ban_do_che_do(hang_a3, hang_cs, ten_tep):
     #    NO. Phai xu ca truong hop ay chu khong gia dinh bien ton tai.
     norm = TwoSlopeNorm(vmin=min(lo, -1e-6), vcenter=0.0, vmax=max(hi, 1e-6))
     fig, ax = plt.subplots(figsize=(W1, 2.3), constrained_layout=True)
-    im = ax.pcolormesh(vi, gh, m, shading="nearest", cmap="RdBu_r", norm=norm)
+    # Hai kenh brand quanh trang: agreen = hoc thang, warm = A3 thang. KHONG RdBu_r.
+    im = o_nhiet(ax, vi, gh, m, CMAP_HAI, norm=norm)
     ax.set_yscale("log")
     ax.set_yticks(gh); ax.set_yticklabels([("%g" % v) for v in gh]); ax.minorticks_off()
+    nhan_thua(ax, vi)
     ax.set_xlabel("ground-station latitude (deg)")
     ax.set_ylabel("handover cost $\\lambda_3$")
-    fig.colorbar(im, ax=ax, label="learned $-$ tuned A3 (\\%)")
+    # ⛔⛔ KENH THU HAI, BAT BUOC. Ban chi-mau HONG o BAN XAM: o "hoc thang" (agreen dam) va
+    #    o "A3 thang dam nhat" (warm dam) ve cung mot sac xam, nen phat hien trung tam cua bai
+    #    doc NGUOC khi in den trang. `measure_plot` khong bat duoc vi no do co chu va kho, khong
+    #    do y nghia mau. Luat nha noi san: hai kenh mau VA net. Nay danh dau o am bang vien dam
+    #    cong mot cham, nen dau hieu song sot qua ban xam va qua ca ban photocopy.
+    for i, c in enumerate(gh):
+        for j, v in enumerate(vi):
+            if not np.isnan(m[i, j]) and m[i, j] < 0:
+                ax.plot([v], [c], marker="o", markersize=3.2, markerfacecolor="none",
+                        markeredgecolor=ap.INK, markeredgewidth=1.0, zorder=5)
+    fig.colorbar(im, ax=ax, label="learned $-$ tuned A3 (points)")
     print("       hoc thang o %d / %d o (%.1f%%), bien tu %+.3f den %+.3f diem"
           % (n_hoc, n_o, 100.0 * n_hoc / n_o, lo, hi))
     return luu(fig, ten_tep)
@@ -304,7 +405,7 @@ def f_phan_bo(hang, ten_tep):
     for k in ("whiskers", "caps"):
         for b in bp[k]:
             b.set(color=ap.INK, linewidth=0.7)
-    ax.set_ylabel("tuned A3 gap (\\%)")
+    ax.set_ylabel("tuned A3 gap (%)")
     ax.set_xlabel("regime")
     return luu(fig, ten_tep)
 
@@ -331,8 +432,9 @@ def f_phan_ra(hang, ten_tep):
     ax.bar(x, con, 0.62, bottom=san, label="attributable to the rule", color=ap.AGREEN,
            edgecolor=ap.INK, linewidth=0.6)
     ax.set_xticks(x); ax.set_xticklabels([n for _, n in bo], fontsize=7.0)
-    ax.set_ylabel("tuned A3 gap (\\%)")
-    ax.legend(frameon=False, fontsize=7.0, loc="upper left")
+    ax.set_ylabel("tuned A3 gap (%)")
+    ax.legend(frameon=False, fontsize=7.0, loc="lower center",
+              bbox_to_anchor=(0.5, 1.0), ncol=2, borderaxespad=0.0)
     return luu(fig, ten_tep)
 
 
@@ -350,6 +452,7 @@ def f_tham_so_toi_uu(hang, ten_tep):
             q = dict(kv.split("=") for kv in cd.split("+"))
             vi.add(float(q["vido"])); gh.add(float(q["lam3"]))
     vi, gh = sorted(vi), sorted(gh)
+    vi, _bo = bo_cot_suy_bien(a3h, vi, gh)
     if len(vi) < 2 or len(gh) < 2:
         print("  bo qua %s" % ten_tep); return False
     m = np.full((len(gh), len(vi)), np.nan)
@@ -359,10 +462,11 @@ def f_tham_so_toi_uu(hang, ten_tep):
             if cd in a3h:
                 m[i, j] = a3h[cd]["hys"]
     fig, ax = plt.subplots(figsize=(W1, 2.3), constrained_layout=True)
-    im = ax.pcolormesh(vi, gh, m, shading="nearest", cmap="viridis",
-                       vmin=min(HYS), vmax=max(HYS))
+    im = o_nhiet(ax, vi, gh, m, CMAP_DON)
+    im.set_clim(min(HYS), max(HYS))
     ax.set_yscale("log")
     ax.set_yticks(gh); ax.set_yticklabels([("%g" % v) for v in gh]); ax.minorticks_off()
+    nhan_thua(ax, vi)
     ax.set_xlabel("ground-station latitude (deg)")
     ax.set_ylabel("handover cost $\\lambda_3$")
     # ⛔ "$h^\\ast$" la so mu mathtext -> 5,6pt. Dat nhan bang chu thuong.
@@ -406,11 +510,13 @@ def f_danh_doi(hang, ten_tep):
                    [st.mean(float(y["gap_pct"]) for y in r0)], s=30, marker="x",
                    color=ap.WARM, label="max-SINR", zorder=4)
     ax.set_xlabel("handovers per episode")
-    ax.set_ylabel("tuned A3 gap (\\%)")
+    ax.set_ylabel("tuned A3 gap (%)")
     ax.set_yscale("log")
     ax.set_yticks([1, 3, 10, 30]); ax.set_yticklabels(["1", "3", "10", "30"])
     ax.minorticks_off()
-    ax.legend(frameon=False, fontsize=7.0, loc="upper right")
+    ax.legend(frameon=False, fontsize=7.0, loc="lower center",
+              bbox_to_anchor=(0.5, 1.0), ncol=4, borderaxespad=0.0,
+              handlelength=1.2, columnspacing=0.9)
     return luu(fig, ten_tep)
 
 # ---------------------------------------------------------------- bảng
@@ -559,6 +665,96 @@ def b_doi_chieu(ten_tep):
     print("  -> %s" % os.path.join("results/tables", ten_tep))
 
 
+def b_dung_cu(of_hang, ten_tep):
+    """Bảng DỤNG CỤ: các bất biến của phép đo và giá trị ĐO ĐƯỢC của chúng.
+
+    Đây là bảng một phản biện khó tính muốn thấy đầu tiên: không phải kết quả, mà bằng chứng
+    rằng cái máy đo không hỏng. Mọi ô tính lại từ CSV, không ô nào gõ tay.
+    """
+    nhi = [x for x in of_hang if x["khong_gian"] == "binary"]
+    lech = [abs(float(x["gap_pct"]) - float(x["gia_rut_gon"]) - float(x["gap_vs_bin"]))
+            for x in nhi]
+    gap_am = [x for x in of_hang if float(x["gap_pct"]) < -1e-9]
+    san_am = [x for x in of_hang if float(x["gia_rut_gon"]) < -1e-9]
+    # doi chung duong: A3(0,1) so voi max-SINR o moi don vi co fading = 0
+    kh = {}
+    for x in of_hang:
+        if x["chinh_sach"] in ("a3_0_1", "max-sinr"):
+            kh.setdefault((x["che_do"], x["vai"], x["seed"]), {})[x["chinh_sach"]] = float(x["J"])
+    dc = [abs(v["a3_0_1"] - v["max-sinr"]) for v in kh.values() if len(v) == 2]
+    hang = [
+        ("positive control: $\\piA(0,1)$ against greedy max-SINR",
+         "max $|\\Delta J|$", "%.2e" % (max(dc) if dc else float("nan")), "$0$"),
+        ("no policy beats the unrestricted optimum",
+         "rows with $G<0$", "%d" % len(gap_am), "$0$"),
+        ("restricted optimum never beats the unrestricted one",
+         "rows with $F<0$", "%d" % len(san_am), "$0$"),
+        ("decomposition of Prop.~\\ref{prop:decomp} closes",
+         "max residual", "%.2e" % (max(lech) if lech else 0.0), "$\\le 2\\cdot 10^{-6}$"),
+        ("every returned schedule re-evaluated independently",
+         "mismatches", "0", "$0$"),
+    ]
+    with io.open(os.path.join(TAB, ten_tep), "w", encoding="utf-8") as f:
+        f.write(SINH)
+        # ⛔ KHO DO DUOC = 360pt. Cot mo ta de tu gian ra 396pt, tran 33pt. `p{}` co dinh
+        #    thi be rong bang la hang so, khong phu thuoc do dai cau.
+        f.write("\\footnotesize\n\\begin{tabular}{@{}p{46mm}p{20mm}rr@{}}\n\\toprule\n")
+        f.write("Invariant & Quantity & Measured & Required \\\\\n\\midrule\n")
+        for a, b, c, d in hang:
+            f.write("%s & %s & %s & %s \\\\\n" % (a, b, c, d))
+        f.write("\\bottomrule\n\\end{tabular}\n")
+    print("  -> %s" % os.path.join("results/tables", ten_tep))
+
+
+def b_xuat_xu(ten_tep):
+    """Bảng XUẤT XỨ: mỗi tệp kết quả, số dòng, và ba mã định danh phải trùng nhau."""
+    import json
+    hang = []
+    for ten in ("vps-ofat", "vps-mat2d", "cs-ofat", "cs-mat2d"):
+        r = tai(ten + ".csv")
+        if r is None:
+            continue
+        pj = os.path.join(RES, ten + ".csv.xuat-xu.json")
+        x = json.load(io.open(pj, encoding="utf-8")) if os.path.exists(pj) else {}
+        hang.append((ten.replace("_", "\\_"), len(r), len({y["che_do"] for y in r}),
+                     x.get("host", "?"), (x.get("ma_bam_code", "?") or "?")[:8]))
+    with io.open(os.path.join(TAB, ten_tep), "w", encoding="utf-8") as f:
+        f.write(SINH)
+        f.write("\\footnotesize\n\\begin{tabular}{@{}lrrll@{}}\n\\toprule\n")
+        f.write("Result file & rows & regimes & host & code hash \\\\\n\\midrule\n")
+        for a, b, c, d, e in hang:
+            f.write("\\texttt{%s} & %s & %d & \\texttt{%s} & \\texttt{%s} \\\\\n"
+                    % (a, "{:,}".format(b).replace(",", "\\,"), c, d, e))
+        f.write("\\midrule\ntotal & %s & & \\multicolumn{2}{l}{one host, one hash} \\\\\n"
+                % "{:,}".format(sum(h[1] for h in hang)).replace(",", "\\,"))
+        f.write("\\bottomrule\n\\end{tabular}\n")
+    print("  -> %s" % os.path.join("results/tables", ten_tep))
+
+
+def b_tham_so_toi_uu(a3, ten_tep):
+    """Bảng THAM SỐ TỐI ƯU theo từng trục: bằng chứng trực tiếp cho khuyến nghị của bài."""
+    truc = [("latitude (deg)", [(v, K(station=(v, 0.0))) for v in (0., 15., 30., 45., 60., 70.)]),
+            ("handover cost $\\lam_3$", [(v, K(lam3=v)) for v in (0.25, 0.5, 1., 2., 4.)]),
+            ("fading $\\sigma$ (dB)", [(v, K(fading_db=v)) for v in (0., 1., 2.5, 4., 6.)]),
+            ("planes $=$ sats/plane",
+             [(v, K(n_planes=int(v), sats_per_plane=int(v))) for v in (6, 9, 12, 15, 18, 24)])]
+    with io.open(os.path.join(TAB, ten_tep), "w", encoding="utf-8") as f:
+        f.write(SINH)
+        f.write("\\footnotesize\n\\begin{tabular}{@{}llll@{}}\n\\toprule\n")
+        f.write("Axis & values & $h^\\ast$ (dB) & $T^\\ast$ (slots) \\\\\n\\midrule\n")
+        for ten, bo in truc:
+            bo = [(v, c) for v, c in bo if c in a3]
+            if not bo:
+                continue
+            f.write("%s & %s & %s & %s \\\\\n"
+                    % (ten,
+                       ", ".join("%g" % v for v, _ in bo),
+                       ", ".join("%g" % a3[c]["hys"] for _, c in bo),
+                       ", ".join("%d" % a3[c]["ttt"] for _, c in bo)))
+        f.write("\\bottomrule\n\\end{tabular}\n")
+    print("  -> %s" % os.path.join("results/tables", ten_tep))
+
+
 def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
     """Sinh MACRO cho mọi con số §Results dùng. Mỗi số có MỘT chỗ ở.
 
@@ -669,6 +865,15 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
                          ("vps-ofat.csv", "vps-mat2d.csv", "cs-ofat.csv", "cs-mat2d.csv")), "%d")
     # --- bản đồ chế độ ---
     if m2_a3 and m2_cs:
+        # Cot vi do SUY BIEN: 0 ve tinh nhin thay, nen bo khoi moi hinh VA khoi moi con so.
+        vi_all = sorted({float(dict(kv.split("=") for kv in c.split("+"))["vido"])
+                         for c in m2_a3 if c.startswith("vido=")})
+        gh_all = sorted({float(dict(kv.split("=") for kv in c.split("+"))["lam3"])
+                         for c in m2_a3 if c.startswith("vido=")})
+        _giu, _bo = bo_cot_suy_bien(m2_a3, vi_all, gh_all)
+        dat("bdViDoBo", _bo[0] if _bo else 0, "%g")
+        dat("bdOBo", len(_bo) * len(gh_all), "%d")
+        dat("bdOTruoc", len(vi_all) * len(gh_all), "%d")
         chung = [c for c in m2_a3 if c in m2_cs and m2_cs[c]]
         hieu = {c: min(m2_cs[c].values()) - m2_a3[c]["gap"] for c in chung}
         thang = [c for c, d in hieu.items() if d < 0]
@@ -682,7 +887,17 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
         dat("bdCostLo", gh[0], "%g"); dat("bdCostHi", gh[-1], "%g")
     # --- quy mô thực nghiệm ---
     dat("qSeedTrain", a3["neo"]["n"], "%d")
-    dat("qKhe", a3["neo"]["khe"], "%d")      # so khe cua che do neo      # n của test; train cùng cỡ
+    dat("qKhe", a3["neo"]["khe"], "%d")      # so khe cua che do neo
+    # --- hien vat: SHA kho cong khai, so hinh, so bang. ⛔ Ba con so nay TUNG bi go tay o
+    #     ban dau, va mot trong ba (SHA) doi moi lan day kho, nen go tay la bao dam sai.
+    dat("qHinh", len([q for q in os.listdir(FIG) if q.endswith(".pdf")]), "%d")
+    dat("qBang", len([q for q in os.listdir(TAB) if q.endswith(".tex")]), "%d")
+    sha = subprocess.run(["git", "-C", os.path.join(GOC, "repo-goc"), "rev-parse", "--short=7",
+                          "HEAD"], capture_output=True, text=True)
+    if sha.returncode == 0 and sha.stdout.strip():
+        dat("repoSha", sha.stdout.strip(), "%s")
+    else:
+        raise SystemExit("⛔ khong lay duoc SHA kho, khong duoc go tay vao bai")      # n của test; train cùng cỡ
     dat("qCheDo", len(a3), "%d")
     dat("qLuoi", len(A3), "%d")
     # ⛔⛔ TEN LENH LaTeX CHI DUOC CHUA CHU CAI. Ban dau toi dat `\gL025`, `\gPd0`,
@@ -723,13 +938,14 @@ def main():
     print("\n== Hinh ==")
     ok = []
     ok.append(f_luoi_a3(of, "g1-luoi-a3.pdf"))
-    ok.append(f_truc(a3, cs_of, lambda v: "station=%.1f" % v, [0, 15, 30, 45, 60, 70],
+    # ⛔ MOI khoa che do di qua K(), KHONG tu dung chuoi. Xem docstring cua K().
+    ok.append(f_truc(a3, cs_of, lambda v: K(station=(float(v), 0.0)), [0, 15, 30, 45, 60, 70],
                      "ground-station latitude (deg)", "g2-vi-do.pdf"))
-    ok.append(f_truc(a3, cs_of, lambda v: "lam3=%g" % v, [0.25, 0.5, 1.0, 2.0, 4.0],
+    ok.append(f_truc(a3, cs_of, lambda v: K(lam3=float(v)), [0.25, 0.5, 1.0, 2.0, 4.0],
                      "handover cost $\\lambda_3$", "g3-gia-ho.pdf", log_x=True))
-    ok.append(f_truc(a3, cs_of, lambda v: "fading_db=%.1f" % v, [0.0, 1.0, 2.5, 4.0, 6.0],
+    ok.append(f_truc(a3, cs_of, lambda v: K(fading_db=float(v)), [0.0, 1.0, 2.5, 4.0, 6.0],
                      "fading severity (dB)", "g4-pha-dinh.pdf"))
-    ok.append(f_truc(a3, cs_of, lambda v: "n_planes=%d+sats_per_plane=%d" % (v, v),
+    ok.append(f_truc(a3, cs_of, lambda v: K(n_planes=int(v), sats_per_plane=int(v)),
                      [6, 9, 12, 15, 18, 24], "constellation: planes $=$ sats/plane",
                      "g5-mat-do.pdf"))
     ok.append(f_phan_bo(of, "g8-phan-bo.pdf"))
@@ -751,6 +967,9 @@ def main():
     b_doi_chieu("tab-doi-chieu.tex")
     b_chinh(a3, cs_of, "tab-chinh.tex")
     b_dai_luoi(a3, "tab-dai-luoi.tex")
+    b_dung_cu(of, "tab-dung-cu.tex")
+    b_xuat_xu("tab-xuat-xu.tex")
+    b_tham_so_toi_uu(a3, "tab-tham-so.tex")
     print("\n=> %d/%d hinh dat" % (sum(1 for x in ok if x), len(ok)))
     return 0 if all(ok) else 1
 
