@@ -106,6 +106,22 @@ def cham(tep=None):
 
     nguon = tep or {p: doc(p) for p in DANH_SACH_NGUON()}
     than = "\n".join(v for p, v in nguon.items() if "frag-" not in os.path.basename(p))
+
+    # ---- B17 bo sinh hinh phai CHAY SACH ----
+    # ⛔ Day la phep kiem bat duoc lop loi "hinh ve THIEU DIEM ma khong ai bao": `f_truc` nay
+    #    tra False khi mot khoa che do khong khop, va bo sinh thoat ma 1. Mot hinh ve 2 tren 5
+    #    diem da loi toi ban gui doc ngoai vi khong co cong nao chay lai bo sinh.
+    _r = subprocess.run([sys.executable, os.path.join(HERE, "sinh_hinh_bang.py")],
+                        capture_output=True, text=True)
+    _d = [l for l in _r.stdout.splitlines() if "hinh dat" in l]
+    kiem(_r.returncode == 0, "B17 bo sinh hinh chay sach",
+         (_d[-1].strip() if _d else "ma tra ve %d" % _r.returncode))
+
+    # ⛔⛔ BANG MACRO PHAI NAP SAU KHI BO SINH CHAY, khong truoc. Phep tiem chung minh:
+    #    ca "tinh ti so o do chinh xac day du" sua BO SINH, nhung `mac` da nap tu tep cu nen
+    #    B20 van doc 9,1 va bao DAT trong khi tep vua sinh ra 9,2. Dung lop loi "cong cham
+    #    ban dung CU" da can o B16, va no quay lai ngay o phep kiem ke tiep vi toi chi doi
+    #    THU TU HAI PHEP thay vi dat bo sinh len dau. Nay bo sinh chay TRUOC moi thu.
     mac = macro()
 
     # ---- B1 dung sach: dung lai tu nguon dang kiem, trong thu muc TAM ----
@@ -140,11 +156,20 @@ def cham(tep=None):
         kiem(not re.findall(r"Citation.*undefined", log), "B3 khong trich dan treo")
         kiem("Overfull" not in log, "B4 khong tran cot",
              "%d Overfull" % log.count("Overfull"))
+        # ⛔ Khi mot ca tiem lam LaTeX hong NANG den muc khong ra PDF, cong phai ghi nhan
+        #    HONG chu khong duoc nem ngoai le: mot cong chet giua chung thi khong phep kiem
+        #    nao sau no chay, va bo tiem bao "that bai" thay vi "bat duoc". Khong ra PDF
+        #    chinh la dang hong nang nhat, nen no phai di qua duong HONG binh thuong.
         import fitz
-        pdf = fitz.open(os.path.join(d, "main.pdf"))
-        intr = "\n".join(pdf[i].get_text() for i in range(pdf.page_count))
-        so_trang = pdf.page_count
-        pdf.close()
+        _pp = os.path.join(d, "main.pdf")
+        if os.path.exists(_pp):
+            pdf = fitz.open(_pp)
+            intr = "\n".join(pdf[i].get_text() for i in range(pdf.page_count))
+            so_trang = pdf.page_count
+            pdf.close()
+        else:
+            kiem(False, "B1b co sinh ra PDF", "khong co main.pdf sau 3 luot pdflatex")
+            intr, so_trang = "", 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -190,8 +215,14 @@ def cham(tep=None):
     }
     if goc:
         # B7a macro phai khop CSV tinh lai bang CAI DAT DOC LAP
-        lech = [(m, mac.get(m), "%.2f" % goc[cd]) for cd, (m, _, _) in NEO_CAU.items()
-                if cd in goc and mac.get(m) != "%.2f" % goc[cd]]
+        # ⛔ KHONG co dinh "%.2f": mot so macro in o BA chu so (vi chung la can cu cho mot
+        #    phep chia ma doc gia lam lai tren giay). Phep kiem phai so o DUNG do chinh xac
+        #    macro khai, khong ap mot do chinh xac cua rieng no.
+        def _nhu(m, v):
+            n = len(mac[m].split(".")[-1]) if "." in mac[m] else 0
+            return "%.*f" % (n, v)
+        lech = [(m, mac.get(m), _nhu(m, goc[cd])) for cd, (m, _, _) in NEO_CAU.items()
+                if cd in goc and m in mac and mac[m] != _nhu(m, goc[cd])]
         kiem(not lech, "B7a macro khop CSV tinh lai doc lap",
              "lech: %s" % lech if lech else "%d/%d khop" % (len(NEO_CAU), len(NEO_CAU)))
         # B7b gia tri ay phai that su IN RA (bat ca bai quen \input macro)
@@ -277,16 +308,6 @@ def cham(tep=None):
     #    TRUOC B16 (soi hinh tren dia). Ban dau nguoc lai, nen khi tiem loi `\%` vao bo sinh
     #    thi B16 doc cac PDF CU con sach va bao DAT, roi B17 moi ve lai hinh hong. Cong logic
     #    dung ma cham ban dung CU: lop loi 32 cua so nha, lap lai y nguyen o day.
-    # ---- B17 bo sinh hinh phai CHAY SACH ----
-    # ⛔ Day la phep kiem bat duoc lop loi "hinh ve THIEU DIEM ma khong ai bao": `f_truc` nay
-    #    tra False khi mot khoa che do khong khop, va bo sinh thoat ma 1. Mot hinh ve 2 tren 5
-    #    diem da loi toi ban gui doc ngoai vi khong co cong nao chay lai bo sinh.
-    _r = subprocess.run([sys.executable, os.path.join(HERE, "sinh_hinh_bang.py")],
-                        capture_output=True, text=True)
-    _d = [l for l in _r.stdout.splitlines() if "hinh dat" in l]
-    kiem(_r.returncode == 0, "B17 bo sinh hinh chay sach",
-         (_d[-1].strip() if _d else "ma tra ve %d" % _r.returncode))
-
     # ---- B16 KHONG `\%` literal trong HINH ----
     # ⛔ usetex TAT, nen `"gap (\\%)"` trong matplotlib in ra DAU GACH CHEO tren giay. Ba hinh
     #    da di toi tan ban gui doc ngoai voi loi nay, va `measure_plot` khong bat vi no do co
@@ -328,6 +349,74 @@ def cham(tep=None):
             shutil.rmtree(_dd, ignore_errors=True)
     else:
         chu_y("B18 bo qua: khong thay measure_figure.py hoac g0-luong.pdf")
+
+    # ---- B19 MOI SO TRONG BANG phai tinh lai duoc tu CSV, bang mot cai dat KHAC ----
+    # ⛔⛔ Phan bien ngoai 11/10 bat mot bang TOM TAT in sai vi bo sinh dung khoa che do sai
+    #    chinh ta, va hau qua la bang DAO NGUOC thu hang cac truc so voi ket luan cua bai.
+    #    Cong cu chi hoi "macro co ton tai khong" va "so co in ra khong", khong hoi "con so
+    #    TONG HOP nay co dung khong". Nay tinh lai tung o cua bang truc che do tu CSV tho,
+    #    bang mot cai dat doc lap, va so tung o.
+    import csv as _csv
+    _p = os.path.join(RES, "vps-ofat.csv")
+    _bang = os.path.join(RES, "tables", "tab-che-do.tex")
+    if os.path.exists(_p) and os.path.exists(_bang):
+        _g = {}
+        for x in _csv.DictReader(io.open(_p, encoding="utf-8")):
+            _g.setdefault((x["che_do"], x["vai"]), {}).setdefault(x["chinh_sach"], []).append(x)
+
+        def _gap(cd):
+            tr, te = _g[(cd, "train")], _g[(cd, "test")]
+            tb = {k: st.mean(float(y["gap_pct"]) for y in tr[k]) for k in A3 if k in tr}
+            return st.mean(float(y["gap_pct"]) for y in te[min(tb, key=tb.get)])
+
+        _truc = {
+            "latitude": ["station=%.1f" % v for v in (0., 15., 30., 45., 60., 70.)],
+            "handover cost": ["neo" if v == 1.0 else "lam3=%s" % v
+                              for v in (0.25, 0.5, 1.0, 2.0, 4.0)],
+            "fading": ["neo" if v == 2.5 else "fading_db=%.1f" % v
+                       for v in (0., 1., 2.5, 4., 6.)],
+            "slot": ["neo" if d == 15 else "S=%d+slot_seconds=%d" % (int(1800 / d), d)
+                     for d in (5, 15, 30, 60)],
+            "planes": ["neo" if k == 18 else "n_planes=%d+sats_per_plane=%d" % (k, k)
+                       for k in (6, 9, 12, 15, 18, 24)],
+        }
+        _van = doc(_bang)
+        _xau = []
+        for _ten, _cds in _truc.items():
+            _v = [_gap(c) for c in _cds if (c, "test") in _g]
+            if len(_v) != len(_cds):
+                _xau.append((_ten, "thieu %d khoa" % (len(_cds) - len(_v)))); continue
+            _dong = [l for l in _van.splitlines() if l.startswith(_ten.split()[0])]
+            if not _dong:
+                _xau.append((_ten, "khong thay hang")); continue
+            _so = re.findall(r"(\d+\.\d+)", _dong[0].split("&", 2)[2])
+            _mong = ["%.2f" % min(_v), "%.2f" % max(_v), "%.2f" % (max(_v) - min(_v))]
+            if _so[-3:] != _mong:
+                _xau.append((_ten, "bang in %s, tinh lai ra %s" % (_so[-3:], _mong)))
+        kiem(not _xau, "B19 moi o cua bang truc che do khop CSV tinh lai",
+             ("lech: %s" % _xau) if _xau else "%d truc khop" % len(_truc))
+
+    # ---- B20 TI SO IN RA phai bang ti so CUA CAC SO IN RA ----
+    # ⛔ Bai in 2,91 va 0,32 roi in ti so 9,2; nguoi doc chia tay ra 9,1. Mot so khong kiem
+    #    lai duoc tu chinh trang giay la mot so khong kiem duoc.
+    _ts = [("gLatPolarRatio", "gLatPolar", "gLatLow"),
+           ("gCostRatio", "gCostHigh", "gCostLow"),
+           ("gFadeZeroTi", "gFadeZeroFloor", "gFadeZero")]
+    _xau2 = []
+    for _r, _tu, _mau in _ts:
+        if not all(k in mac for k in (_r, _tu, _mau)):
+            continue
+        # ⛔⛔ BAN DAU PHEP NAY HOI "ti so co nam trong DAI lam tron khong". Phep tiem chung
+        #    minh no YEU: dai cua 2,91/0,32 la [8,94; 9,25], nen con so SAI 9,2 van lot, dung
+        #    cai so phan bien ngoai bat. Mot dieu kien CAN khong thay duoc dieu kien DU. Nay
+        #    hoi dung cai doc gia lam: chia hai so in ra, lam tron ve do chinh xac cua ti so.
+        _k = 100.0 if _r.endswith("Ti") else 1.0
+        _n = len(mac[_r].split(".")[-1]) if "." in mac[_r] else 0
+        _mong = "%.*f" % (_n, round(_k * float(mac[_tu]) / float(mac[_mau]), _n))
+        if mac[_r] != _mong:
+            _xau2.append((_r, "bai in %s, chia tay ra %s" % (mac[_r], _mong)))
+    kiem(not _xau2, "B20 ti so in ra BANG ti so cua cac so in ra",
+         ("lech: %s" % _xau2) if _xau2 else "%d ti so khop" % len(_ts))
 
     # ---- B15 khong hien vat nao chi ton tai mot noi ----
     # Mot bang sinh ra ma main.tex khong \input la mot bang chet; cong phai thay.
@@ -393,6 +482,8 @@ def tu_kiem():
          None),
         ("B16: tra lai `\\%` literal trong nhan hinh",
          None),
+        ("B19: tra lai khoa `%g` cho bang truc che do", None),
+        ("B20: tinh ti so o do chinh xac day du thay vi tu so in ra", None),
         ("B2: tiem mot \\ref treo",
          lambda: doi(kq, r"Table~\ref{tab:dai}", r"Table~\ref{tab:khong-co}")),
     ]
@@ -403,6 +494,16 @@ def tu_kiem():
     bs = os.path.join(HERE, "sinh_hinh_bang.py")
     ma_goc = doc(bs)
     tiem_ma = {
+        # ⛔ BA CA DUOI DAY tai hien DUNG ba loi phan bien ngoai tim ra ngay 11/10, va chung
+        #    tiem vao BO SINH vi do la noi ba loi that da nam.
+        "B19: tra lai khoa `%g` cho bang truc che do":
+            ('[K(lam3=v) for v in (0.25, 0.5, 1., 2., 4.)]',
+             '[("lam3=%g" % v) for v in (0.25, 0.5, 1., 2., 4.)]'),
+        "B20: tinh ti so o do chinh xac day du thay vi tu so in ra":
+            ('dat("gLatPolarRatio", _ti(a3[K(station=(70.0, 0.0))]["gap"],\n'
+             '                              a3[K(station=(15.0, 0.0))]["gap"]), "%.1f")',
+             'dat("gLatPolarRatio", a3[K(station=(70.0, 0.0))]["gap"]\n'
+             '        / a3[K(station=(15.0, 0.0))]["gap"], "%.1f")'),
         "B17: lam mot khoa che do sai chinh ta trong bo sinh":
             ('lambda v: K(lam3=float(v))', 'lambda v: "lam3=%g" % v'),
         "B16: tra lai `\\%` literal trong nhan hinh":

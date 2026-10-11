@@ -103,6 +103,38 @@ def nhan_thua(ax, vi):
     ax.set_xticks(chon); ax.set_xticklabels(["%g" % v for v in chon])
 
 
+def _ti3_sau(a3, c):
+    """Tỉ lệ sàn trên khoảng cách, tính từ giá trị ĐÃ LÀM TRÒN như bài in."""
+    return 100.0 * round(a3[c]["gia"], 3) / round(a3[c]["gap"], 3)
+
+
+def che_do_rieng(a3):
+    """Trả về một TÊN cho mỗi ĐIỀU KIỆN khác nhau, bỏ các tên trùng điều kiện.
+
+    ⛔⛔ Phản biện ngoài 11/10 bắt đúng chỗ này. Bộ quét đi theo từng trục, và điểm GIỮA của
+    mỗi trục chính là chế độ neo, nên chế độ neo được chạy và ghi lại **sáu lần** dưới sáu
+    cái tên: `neo`, `n_planes=18+sats_per_plane=18`, `fading_db=2.5`, `lam3=1.0`,
+    `S=120+slot_seconds=15`, `station=45.0`. Lấy trung vị hay tương quan trên 27 tên tức là
+    cân điểm neo gấp sáu lần mọi điểm khác. Đó là một lỗi thống kê, không phải lỗi đếm.
+    """
+    import sys as _s
+    _s.path.insert(0, HERE)
+    from quet_che_do import NEO as _NEO, TRUC as _TRUC
+    dk, ra = {}, []
+    for ten in sorted(a3):
+        if ten == "neo":
+            kw = {}
+        else:
+            kw = next((k for tr in _TRUC for k in _TRUC[tr] if ten_che_do(k) == ten), None)
+            if kw is None:            # che do cua lat 2D, khong thuoc truc nao
+                ra.append(ten); continue
+        p_ = dict(_NEO); p_.update(kw)
+        khoa = tuple(sorted((k, str(v)) for k, v in p_.items()))
+        if khoa not in dk:
+            dk[khoa] = ten; ra.append(ten)
+    return ra
+
+
 def o_nhiet(ax, X, Y, M, cmap, norm=None):
     """Vẽ một bản đồ nhiệt theo đúng luật nhà, và đó là lý do nó là một hàm riêng.
 
@@ -597,26 +629,34 @@ def b_che_do(a3, ten_tep):
     Bảng này thay được cả một đoạn văn, và nó trả lời câu "trục nào quan trọng" bằng một
     cột duy nhất: biên độ khoảng cách dọc trục ấy.
     """
+    # ⛔⛔ PHAN BIEN NGOAI BAT DUNG CHO NAY, 11/10. Hang gia chuyen giao dung
+    #    `"lam3=%g" % 1.0` ra `lam3=1` trong khi ten that la `lam3=1.0`, nen BA trong NAM
+    #    gia tri khong khop va bang bao do trai 0,08 thay vi 1,67. Hau qua khong phai lam
+    #    dep: no DAO NGUOC thu hang cac truc, tuc bang tom tat noi NGUOC lai ket luan cua
+    #    chinh bai. Day la LAN THU BA cung mot lop loi, va hai lan truoc toi chi va mot cho.
+    #    Nay moi khoa di qua K(), VA ham doi moi khoa phai giai duoc chu khong im lang bo qua.
     truc = [
         ("latitude $\\phi$ (deg)", "0, 15, 30, 45, 60, 70",
-         [("station=%.1f" % v) for v in (0., 15., 30., 45., 60., 70.)]),
+         [K(station=(v, 0.0)) for v in (0., 15., 30., 45., 60., 70.)]),
         ("handover cost $\\lam_3$", "0.25, 0.5, 1, 2, 4",
-         [("lam3=%g" % v) for v in (0.25, 0.5, 1., 2., 4.)]),
+         [K(lam3=v) for v in (0.25, 0.5, 1., 2., 4.)]),
         ("fading $\\sigma$ (dB)", "0, 1, 2.5, 4, 6",
-         [("fading_db=%.1f" % v) for v in (0., 1., 2.5, 4., 6.)]),
+         [K(fading_db=v) for v in (0., 1., 2.5, 4., 6.)]),
         ("slot $\\Delta$ (s)", "5, 15, 30, 60",
-         [("S=%d+slot_seconds=%d" % (int(1800 / d), d)) for d in (5, 15, 30, 60)]),
+         [K(S=int(1800 / d), slot_seconds=d) for d in (5, 15, 30, 60)]),
         ("planes $=$ sats/plane", "6, 9, 12, 15, 18, 24",
-         [("n_planes=%d+sats_per_plane=%d" % (k, k)) for k in (6, 9, 12, 15, 18, 24)]),
+         [K(n_planes=k, sats_per_plane=k) for k in (6, 9, 12, 15, 18, 24)]),
     ]
     with io.open(os.path.join(TAB, ten_tep), "w", encoding="utf-8") as f:
         f.write(SINH)
         f.write("\\begin{tabular}{llrrr}\n\\toprule\n")
         f.write("Axis & Values swept & min gap & max gap & span \\\\\n\\midrule\n")
         for ten, gt, cds in truc:
-            v = [a3[c]["gap"] for c in cds if c in a3]
-            if not v:
-                continue
+            thieu = [c for c in cds if c not in a3]
+            # ⛔ KHONG `if c in a3` roi di tiep: bo qua am tham la cach loi tren song sot.
+            assert not thieu, ("⛔ bang truc che do: khoa KHONG giai duoc tren truc %r: %s"
+                               % (ten, thieu))
+            v = [a3[c]["gap"] for c in cds]
             f.write("%s & %s & %.2f & %.2f & \\textbf{%.2f} \\\\\n"
                     % (ten, gt, min(v), max(v), max(v) - min(v)))
         f.write("\\bottomrule\n\\end{tabular}\n")
@@ -780,7 +820,13 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
     dat("gLatLow", a3[K(station=(15.0, 0.0))]["gap"])
     dat("gLatPolar", a3[K(station=(70.0, 0.0))]["gap"])
     dat("gLatPolarFloor", a3[K(station=(70.0, 0.0))]["gia"])
-    dat("gLatPolarRatio", a3[K(station=(70.0, 0.0))]["gap"] / a3[K(station=(15.0, 0.0))]["gap"], "%.1f")
+    # ⛔ PHAN BIEN NGOAI: bai in 2,91 va 0,32 roi in ti so 9,2, nhung nguoi doc chia hai so
+    #    IN RA se ra 9,1. Ti so tinh o do chinh xac day du KHONG kiem lai duoc tu trang giay.
+    #    Nay moi ti so tinh TU CHINH HAI SO BAI IN, nen doc gia lam lai luon ra dung.
+    def _ti(tu, mau):
+        return round(float("%.2f" % tu) / float("%.2f" % mau), 1)
+    dat("gLatPolarRatio", _ti(a3[K(station=(70.0, 0.0))]["gap"],
+                              a3[K(station=(15.0, 0.0))]["gap"]), "%.1f")
     # ⭐ CƠ CHẾ phía sau trục mạnh nhất. ⛔ GIẢI THÍCH ĐẦU CỦA TÔI SAI và số liệu bác ngay:
     #    tôi viết "vì 70° THIẾU ỨNG VIÊN (1,82/khe)". Nhưng chế độ mật độ 6 còn thiếu hơn
     #    (1,20/khe) mà khoảng cách chỉ 0,41%, tức thiếu ứng viên MỘT MÌNH không giải thích gì.
@@ -806,12 +852,16 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
     # --- giá chuyển giao ---
     dat("gCostHigh", a3[K(lam3=4.0)]["gap"]); dat("gCostHighFloor", a3[K(lam3=4.0)]["gia"])
     dat("gCostLow", a3[K(lam3=0.25)]["gap"])
-    dat("gCostRatio", a3[K(lam3=4.0)]["gap"] / a3[K(lam3=0.25)]["gap"], "%.1f")
+    dat("gCostRatio", _ti(a3[K(lam3=4.0)]["gap"], a3[K(lam3=0.25)]["gap"]), "%.1f")
     dat("gCostHighGreedy", a3[K(lam3=4.0)]["msinr"])
     dat("gHysDich", "%g, %g, %g, %g, %g" % tuple(
         a3[K(lam3=c)]["hys"] for c in (0.25, 0.5, 1.0, 2.0, 4.0)))
     # --- pha đinh ---
-    dat("gFadeZero", a3[K(fading_db=0.0)]["gap"]); dat("gFadeZeroFloor", a3[K(fading_db=0.0)]["gia"])
+    dat("gFadeZero", a3[K(fading_db=0.0)]["gap"], "%.3f")
+    # ⛔ Hai so nay la can cu cho cau "hon mot nua". O hai chu so (0,06 va 0,11) nguoi doc
+    #    chia ra 54,5% trong khi bai in 53,5%. In ba chu so thi phep chia tren giay ra dung.
+    dat("gFadeZeroFloor", a3[K(fading_db=0.0)]["gia"], "%.3f")
+    dat("gFadeZeroTi", _ti3_sau(a3, K(fading_db=0.0)), "%.1f")
     dat("gFadeZeroLearn", cs[K(fading_db=0.0)]["KAN"], "%.3f")
     dat("gFadeMid", a3[K(fading_db=2.5)]["gap"]); dat("gFadeHigh", a3[K(fading_db=6.0)]["gap"])
     # --- mật độ: tỉ lệ ứng viên và dải khoảng cách, để §Results khỏi gõ tay "mười chín lần" ---
@@ -826,11 +876,23 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
     #    lượng khác nhau trên hai dân số khác nhau, và tên macro cũ không nói rõ cái nào, nên
     #    nó suýt thành một con số bịa trong §Results. Nay tính trên ĐÚNG A3 đã chỉnh, mỗi chế
     #    độ một điểm, và tên nói rõ.
-    ti = sorted(100.0 * a3[c]["gia"] / a3[c]["gap"] for c in a3 if a3[c]["gap"] > 1e-9)
+    # ⛔⛔ PHAN BIEN NGOAI, 11/10: bai khai "27 diem che do" nhung chi co 22 DIEU KIEN khac
+    #    nhau. Diem neo xuat hien SAU lan: mot lan la `neo`, nam lan nua la diem giua cua nam
+    #    truc. Trung vi va tuong quan tinh tren 27 TEN tuc la can diem neo gap sau lan. Nay
+    #    moi thong ke tinh tren DIEU KIEN khac nhau; so 27 van bao, nhung bao dung la so DIEM
+    #    DA CHAY, va 22 la so dieu kien.
+    rieng = che_do_rieng(a3)
+    # ⛔ Ti le tinh tu gia tri DA LAM TRON ve dung do chinh xac bai in (ba chu so), de
+    #    `gSanTiHi` va `gFadeZeroTi` noi cung mot so cho cung mot che do, va de doc gia
+    #    chia tay ra dung. Tinh o do chinh xac day du thi hai cho lech nhau 0,3 diem.
+    def _ti3(c):
+        return 100.0 * round(a3[c]["gia"], 3) / round(a3[c]["gap"], 3)
+    ti = sorted(_ti3(c) for c in rieng if a3[c]["gap"] > 1e-9)
     dat("gSanTiTv", ti[len(ti) // 2], "%.1f")
     dat("gSanTiLo", max(0.0, ti[0]), "%.1f")      # ⛔ kep ve 0: tỉ lệ âm là vô nghĩa, và nó
     dat("gSanTiHi", ti[-1], "%.1f")               #    chỉ sinh ra từ làm tròn -0.000000
     dat("gSanCheDo", len(ti), "%d")
+    dat("qCheDoRieng", len(rieng), "%d")
     # ⛔⛔ CÂU TÔI ĐÃ VIẾT BỊ CHÍNH PHÉP ĐO NÀY BÁC. Tôi viết trong §Results rằng "sàn nhỏ ở
     #    70° vì chỉ có <2 ứng viên nên A_bin gần trùng A_full". Nghe rất hợp lý. Nhưng sàn ở
     #    70° là 0,118, LỚN HƠN sàn ở 15° (0,004) dù 15° có 7,6 ứng viên. Tức thiếu ứng viên
@@ -842,7 +904,7 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
         ma, mb = st.mean(a), st.mean(b)
         return (sum((x - ma) * (y - mb) for x, y in zip(a, b))
                 / _m.sqrt(sum((x - ma) ** 2 for x in a) * sum((y - mb) ** 2 for y in b)))
-    _cd = [c for c in a3 if a3[c]["gap"] > 1e-9]
+    _cd = [c for c in rieng if a3[c]["gap"] > 1e-9]
     dat("gSanTuongQuanVis", _pear([a3[c]["gia"] for c in _cd], [a3[c]["vis"] for c in _cd]), "%.2f")
     dat("gSanLonNhatMong", a3[K(station=(70.0, 0.0))]["gia"], "%.3f")
     dat("gSanNhoNhatDay", a3[K(station=(15.0, 0.0))]["gia"], "%.3f")
@@ -861,8 +923,19 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
         "⛔ dem dong nhi phan khong gom du bon ho"
     dat("gSanDongMoiCauHinh", nhi, "%d")
     # Tổng mọi dòng kết quả, để §Setup khai đúng quy mô thay vì gõ tay.
-    dat("qDongTong", sum(len(tai(t) or []) for t in
-                         ("vps-ofat.csv", "vps-mat2d.csv", "cs-ofat.csv", "cs-mat2d.csv")), "%d")
+    _tat = [x for t_ in ("vps-ofat.csv", "vps-mat2d.csv", "cs-ofat.csv", "cs-mat2d.csv")
+            for x in (tai(t_) or [])]
+    dat("qDongTong", len(_tat), "%d")
+    # Phan bien ngoai doi khai 498.800 dong chia ra sao. Chia duoc, nen khai.
+    dat("qDongDayDu", sum(1 for x in _tat if x.get("khong_gian") != "binary"), "%d")
+    # So hang GIAO NHAU giua hai ho, tuc co so cua phep doi chung K6d ma §Setup dan ra.
+    def _b(ten, cot):
+        r = tai(ten) or []
+        return {(x["che_do"], x[cot]) for x in r}
+    dat("qGiaoHang", len((_b("vps-ofat.csv", "seed") & _b("cs-ofat.csv", "seed_test"))
+                         | {(a + "|2d", b) for a, b in
+                            (_b("vps-mat2d.csv", "seed") & _b("cs-mat2d.csv", "seed_test"))}),
+        "%d")
     # --- bản đồ chế độ ---
     if m2_a3 and m2_cs:
         # Cot vi do SUY BIEN: 0 ve tinh nhin thay, nen bo khoi moi hinh VA khoi moi con so.

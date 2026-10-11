@@ -222,9 +222,29 @@ def main():
     if thua:
         luu_y("K10b co phep do cho menh de khong con trong bai", ", ".join(thua))
 
+    # ---- K6d MA DUNG CHUNG cho ra SO TRUNG KHIT, bang chung manh hon mot ma bam ----
+    def _bang(ten, cot):
+        r = doc(ten)
+        return {(x["che_do"], x[cot]): (x["J_opt"], x["J_bin"]) for x in r} if r else {}
+    for a_, b_ in (("vps-ofat.csv", "cs-ofat.csv"), ("vps-mat2d.csv", "cs-mat2d.csv")):
+        A, B = _bang(a_, "seed"), _bang(b_, "seed_test")
+        gi = set(A) & set(B)
+        if not gi:
+            luu_y("K6d khong co phan giao giua %s va %s" % (a_, b_))
+            continue
+        lech = [k for k in gi if A[k] != B[k]]
+        kiem(not lech,
+             "K6d %s va %s: DP cho so trung khit tren phan giao" % (a_[:-4], b_[:-4]),
+             "%d/%d hang lech" % (len(lech), len(gi)))
+
     # ---- K6 MOT may ----
+    # ⛔⛔ PHAN BIEN NGOAI BAT DUNG CHO NAY, 11/10. Dong duoi day TUNG la `vps-*.xuat-xu.json`,
+    #    nen cong NAY CHUA BAO GIO nhin cac tep `cs-*` — dung nhanh ma bai khai la nhay voi
+    #    phien ban (chinh sach hoc lech 0,64% giua hai ban torch). Cong bao "MOT ban ma" trong
+    #    khi co HAI, va bang xuat xu in ca hai ngay trong bai. Cong do DAI DIEN chu khong do
+    #    dieu no khai bao ve: dung cai lop loi so tay da ghi, va no song sot vi khong ai tiem.
     xx = {}
-    for p in sorted(glob.glob(os.path.join(RES, "vps-*.xuat-xu.json"))):
+    for p in sorted(glob.glob(os.path.join(RES, "*.csv.xuat-xu.json"))):
         xx[os.path.basename(p)] = json.load(io.open(p, encoding="utf-8"))
     if not xx:
         luu_y("K6 khong co tep xuat-xu nao")
@@ -233,13 +253,30 @@ def main():
         goi = {json.dumps(v["goi"], sort_keys=True) for v in xx.values()}
         kiem(len(host) == 1, "K6a moi ket qua tu MOT host", ", ".join(sorted(host)))
         kiem(len(goi) == 1, "K6b moi ket qua tu MOT bo phien ban goi", "%d bo khac nhau" % len(goi))
+        # ---- K6c: ma bam. Hai ho co the KHAC ma bam mot cach CHINH DANG neu manifest cua
+        #      chung chi khac dung bo chay cua rieng ho. Nen phep kiem khong hoi "co mot ma
+        #      bam khong" ma hoi "phan KHAC NHAU co dung la bo chay rieng khong".
+        ds = {k: set(v.get("tep_ma") or []) for k, v in xx.items()}
+        chung = set.intersection(*ds.values()) if ds else set()
+        rieng = {k: sorted(v - chung) for k, v in ds.items() if v - chung}
+        cho_phep = {"code/quet_chinh_sach.py"}
+        la = {k: [z for z in v if z not in cho_phep] for k, v in rieng.items()}
+        la = {k: v for k, v in la.items() if v}
+        kiem(not la, "K6c manifest chi khac nhau o bo chay rieng cua tung ho",
+             ("la: %s" % la) if la else ("%d tep chung, rieng: %s"
+                                         % (len(chung), rieng or "khong")))
         bam = {v.get("ma_bam_code") for v in xx.values()}
         if None in bam:
             luu_y("K6c co tep xuat-xu THIEU ma_bam_code",
                   "chay lai bo chay de sinh lai: %d/%d tep"
                   % (sum(1 for v in xx.values() if not v.get("ma_bam_code")), len(xx)))
-        else:
-            kiem(len(bam) == 1, "K6c moi ket qua tu MOT ban ma", ", ".join(sorted(map(str, bam))))
+        # ⛔ KHONG con doi "MOT ban ma". Doi the la doi mot dieu KHONG DUNG: ma bam tinh tren
+        #    TAP TEP, nen them dung bo chay cua rieng mot ho da doi ma bam du moi tep dung
+        #    chung y nguyen. Bai tung khai "mot ma bam" nam lan, va do la mot cau SAI ma cong
+        #    cu khong bat vi no chi nhin mot ho. Cai dang doi la K6c (manifest khac nhau o
+        #    dung cho duoc phep) cong K6d (ma dung chung cho ra so trung khit), va ca hai
+        #    deu MANH HON mot phep so chuoi bam.
+        print("       ma bam theo ho: %s" % ", ".join(sorted(str(b)[:8] for b in bam)))
 
     print("\n=> %s (%d loi, %d chu y)"
           % ("DAT" if not loi else "CHUA DAT", len(loi), len(chuy)))
