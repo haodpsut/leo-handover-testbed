@@ -1,0 +1,359 @@
+#!/usr/bin/env python3
+"""Cổng BÀI: kiểm bản thảo đã dựng, không kiểm ý định.
+
+    python3 code/cong_bai.py            # kiểm bài
+    python3 code/cong_bai.py --tu-kiem  # tiêm lỗi, mỗi ca phải làm cổng chuyển ĐẠT -> HỎNG
+
+⛔ Mọi phép kiểm ở đây sinh ra từ một lần sai THẬT, phần lớn là sai của chính tôi ở bài này
+hoặc ở bài IPM vừa nộp. Bốn luật đặt phép kiểm:
+
+1. **Đọc MÃ TRẢ VỀ, không đọc nhãn.** Bản đầu của cổng hình kiểm `"PRINT-READY" in stdout`,
+   mà dòng phán quyết là `PRINT-READY: FAIL`, nên nó báo ĐẠT trên đúng những hình đã bị bác.
+2. **Kiểm trên NGUỒN khi hỏi về nguồn, trên PDF khi hỏi về trang in.** Ở bài IPM, phép kiểm
+   ẩn danh đọc PDF cũ nên không thấy tên trường còn nằm trong tên tệp hình.
+3. **Hai nguồn phải được SO với nhau.** Macro đúng không chứng minh câu văn quanh nó đúng,
+   nên B-SO đối chứng từng số IN TRÊN TRANG với CSV, tính lại từ dữ liệu thô.
+4. **Số đếm được thì máy đếm.** `\\nDeXuat` và mọi `\\g*`/`\\q*`/`\\bd*` phải do bộ sinh phát ra;
+   một chữ số gõ tay trong thân bài là một lỗi, vì chạy lại thí nghiệm không cập nhật nó.
+"""
+import argparse
+import glob
+import io
+import itertools
+import os
+import re
+import statistics as st
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+GOC = os.path.dirname(HERE)
+PAPER = os.path.join(GOC, "paper")
+RES = os.path.join(GOC, "results")
+HYS, TTT = [0.0, 1.0, 2.0, 3.0, 4.0], [1, 2, 3]
+A3 = ["a3_%g_%d" % (h, t) for h, t in itertools.product(HYS, TTT)]
+HL_MAX = 85          # ky tu moi gach highlight, luat Elsevier
+ABS_MAX = 250        # tu abstract
+
+
+def doc(p):
+    return io.open(p, encoding="utf-8").read()
+
+
+def macro():
+    v = {}
+    for t in ("so-lieu.tex", "so-van-lieu.tex"):
+        p = os.path.join(RES, t)
+        if os.path.exists(p):
+            v.update(dict(re.findall(r"\\newcommand\{\\(\w+)\}\{([^}]*)\}", doc(p))))
+    return v
+
+
+def giai(van, mac):
+    """Giải macro thành giá trị IN RA, rồi bỏ lệnh LaTeX, để đếm từ và ký tự như người đọc."""
+    for k, val in sorted(mac.items(), key=lambda x: -len(x[0])):
+        van = van.replace("\\" + k + "{}", val).replace("\\" + k, val)
+    van = re.sub(r"\\begin\{\w+\}|\\end\{\w+\}", " ", van)
+    van = re.sub(r"\\item", " ", van)
+    van = re.sub(r"\\[a-zA-Z]+\*?(\[[^\]]*\])?\{?", " ", van)
+    return re.sub(r"[{}$]|\\%", lambda m: "%" if m.group(0) == "\\%" else "", van)
+
+
+def a3_tu_csv():
+    """Tính lại khoảng cách A3 ĐÃ CHỈNH từ CSV THÔ, độc lập với bộ sinh macro."""
+    import csv
+    p = os.path.join(RES, "vps-ofat.csv")
+    if os.path.exists(p):
+        f_ = io.open(p, encoding="utf-8")
+    elif os.path.exists(p + ".gz"):
+        import gzip
+        f_ = gzip.open(p + ".gz", "rt", encoding="utf-8")
+    else:
+        return {}
+    g = {}
+    for x in csv.DictReader(f_):
+        g.setdefault((x["che_do"], x["vai"]), {}).setdefault(x["chinh_sach"], []).append(x)
+    ra = {}
+    for cd in {k[0] for k in g}:
+        tr, te = g.get((cd, "train"), {}), g.get((cd, "test"), {})
+        if not tr or not te:
+            continue
+        tb = {k: st.mean(float(y["gap_pct"]) for y in tr[k]) for k in A3 if k in tr}
+        tot = min(tb, key=tb.get)
+        ra[cd] = st.mean(float(y["gap_pct"]) for y in te[tot])
+    return ra
+
+
+def DANH_SACH_NGUON():
+    """Mot nguon duy nhat cho danh sach tep nguon, dung boi ca `cham` va phep tiem."""
+    return (sorted(glob.glob(os.path.join(PAPER, "sections", "*.tex")))
+            + [os.path.join(PAPER, "main.tex"),
+               os.path.join(PAPER, "frag-highlights.tex"),
+               os.path.join(PAPER, "fig-luong.tex"),
+               os.path.join(PAPER, "alg-dp.tex")])
+
+
+def cham(tep=None):
+    """tep: {duong_dan: noi_dung} de phep tiem thay noi dung ma khong ghi dia."""
+    loi, luu = [], []
+
+    def kiem(dk, ten, ct=""):
+        print("  %s %s%s" % ("DAT " if dk else "HONG", ten, ("  [" + ct + "]") if ct else ""))
+        if not dk:
+            loi.append(ten)
+
+    def chu_y(s):
+        print("  chu y: %s" % s); luu.append(s)
+
+    nguon = tep or {p: doc(p) for p in DANH_SACH_NGUON()}
+    than = "\n".join(v for p, v in nguon.items() if "frag-" not in os.path.basename(p))
+    mac = macro()
+
+    # ---- B1 dung sach: dung lai tu nguon dang kiem, trong thu muc TAM ----
+    import shutil
+    import tempfile
+    tmp = tempfile.mkdtemp(prefix="cong-bai-")
+    try:
+        shutil.copytree(PAPER, os.path.join(tmp, "paper"))
+        shutil.copytree(RES, os.path.join(tmp, "results"),
+                        ignore=shutil.ignore_patterns("*.csv", "*.json"))
+        shutil.copytree(os.path.join(GOC, "figures"), os.path.join(tmp, "figures"))
+        for p, v in nguon.items():
+            q = os.path.join(tmp, os.path.relpath(p, GOC))
+            io.open(q, "w", encoding="utf-8").write(v)
+        d = os.path.join(tmp, "paper")
+        for f in glob.glob(os.path.join(d, "main.*")):
+            if not f.endswith(".tex"):
+                os.remove(f)
+        r = None
+        for i in range(3):
+            r = subprocess.run(["pdflatex", "-interaction=nonstopmode", "main.tex"],
+                               cwd=d, capture_output=True, text=True)
+            if i == 0:
+                subprocess.run(["bibtex", "main"], cwd=d, capture_output=True, text=True)
+        log = doc(os.path.join(d, "main.log")) if os.path.exists(os.path.join(d, "main.log")) else ""
+        kiem(r.returncode == 0 and "! " not in log, "B1 dung lai SACH tu nguon",
+             "ma tra ve %d, %d dong loi" % (r.returncode, log.count("\n! ")))
+        kiem("Reference" not in log or "undefined" not in log,
+             "B2 khong tham chieu treo",
+             "%d ref + %d cite treo" % (len(re.findall(r"Reference.*undefined", log)),
+                                        len(re.findall(r"Citation.*undefined", log))))
+        kiem(not re.findall(r"Citation.*undefined", log), "B3 khong trich dan treo")
+        kiem("Overfull" not in log, "B4 khong tran cot",
+             "%d Overfull" % log.count("Overfull"))
+        import fitz
+        pdf = fitz.open(os.path.join(d, "main.pdf"))
+        intr = "\n".join(pdf[i].get_text() for i in range(pdf.page_count))
+        so_trang = pdf.page_count
+        pdf.close()
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+    # ---- B5 macro: moi macro bai dung phai TON TAI; va than bai khong go so tay ----
+    dung = set(re.findall(r"\\((?:g|q|bd|n)[A-Z]\w*)", than))
+    kiem(not (dung - set(mac)), "B5 moi macro bai dung deu do bo sinh phat ra",
+         "thieu: %s" % sorted(dung - set(mac)) if dung - set(mac) else "%d macro" % len(dung))
+
+    # ---- B6 KHONG go chu so vao cau ket qua ----
+    # Chi soi 04-results/06-discussion: cac muc khac co tham so mo hinh, duoc phep co so.
+    for ten in ("04-results.tex", "06-discussion.tex"):
+        p = [q for q in nguon if q.endswith(ten)]
+        if not p:
+            continue
+        v = re.sub(r"\\label\{[^}]*\}|\\ref\{[^}]*\}|\\eqref\{[^}]*\}|%[^\n]*", "", nguon[p[0]])
+        v = re.sub(r"\$[^$]*\$", "", v)                      # cong thuc duoc phep co so
+        v = re.sub(r"\\(?:cite|citep)[a-z]*\{[^}]*\}", "", v)
+        so = re.findall(r"(?<![\w\\^{])\d+(?:\.\d+)?(?![\w}])", v)
+        so = [s for s in so if s not in ("10", "6", "2")]    # 10^{-6}, so muc, so mu
+        kiem(not so, "B6 %s khong go chu so tay" % ten,
+             "go tay: %s" % so[:6] if so else "0 so go tay")
+
+    # ---- B7 doi chung BA TANG giua CSV, macro, va cau van ----
+    # ⛔⛔ BAN DAU B7 chi hoi "so nay co xuat hien DAU DO trong PDF khong". Phep tiem chung
+    #    minh no RONG NGHIA: doi `\gNeo` (0,76) thanh `\gNeoTeNhat` (24,3) thi cau van noi
+    #    sai hoan toan, ma cong van DAT, vi 0,76 tinh co cung la gia tri cua `\gFadeMid` nen
+    #    van con in o cho khac. Mot phep kiem "co mat o dau do" khong kiem duoc dieu no khai.
+    #    Nay tach ba tang, va tang B7c moi la tang bat duoc ca tiem ay.
+    goc = a3_tu_csv()
+    NEO_CAU = {                 # (macro bat buoc, cum neo trong NGUON, tep)
+        "neo": ("gNeo", r"\% from the unrestricted optimum", "04-results.tex"),
+        "station=70.0": ("gLatPolar", r"at $\phi=70^\circ$, a factor of", "04-results.tex"),
+        "station=15.0": ("gLatLow", r"The gap grows from", "04-results.tex"),
+        "lam3=4.0": ("gCostHigh", r"the gap grows from", "04-results.tex"),
+        "fading_db=0.0": ("gFadeZero", r"The gap is", "04-results.tex"),
+    }
+    if goc:
+        # B7a macro phai khop CSV tinh lai bang CAI DAT DOC LAP
+        lech = [(m, mac.get(m), "%.2f" % goc[cd]) for cd, (m, _, _) in NEO_CAU.items()
+                if cd in goc and mac.get(m) != "%.2f" % goc[cd]]
+        kiem(not lech, "B7a macro khop CSV tinh lai doc lap",
+             "lech: %s" % lech if lech else "%d/%d khop" % (len(NEO_CAU), len(NEO_CAU)))
+        # B7b gia tri ay phai that su IN RA (bat ca bai quen \input macro)
+        thieu = [m for cd, (m, _, _) in NEO_CAU.items()
+                 if cd in goc and mac.get(m) and mac[m] not in intr]
+        kiem(not thieu, "B7b gia tri macro co in tren trang", "khong in: %s" % thieu)
+        # B7c CAU VAN phai dung DUNG macro ay, khong phai mot macro khac cung dinh dang
+        sai = []
+        for cd, (m, cum, ten) in NEO_CAU.items():
+            p = [q for q in nguon if q.endswith(ten)]
+            if not p or cum not in nguon[p[0]]:
+                sai.append((m, "khong thay cum neo")); continue
+            # Cua so HAI PHIA: macro co the dung truoc cum neo ("sits \gNeo\% from the ...")
+            # hoac sau ("The gap grows from \gLatLow\%"). Phep nay bat viec THAY macro trong
+            # cau, khong bat duoc thu tu hai macro trong cung mot cau, va chi khai den day.
+            i = nguon[p[0]].index(cum)
+            quanh = nguon[p[0]][max(0, i - 110):i + len(cum) + 110]
+            # ⛔ KHONG dung `("\\"+m) in quanh`: `\gNeoTeNhat` CHUA chuoi con `\gNeo`, nen
+            #    phep khop chuoi cho qua dung ca tiem no phai bat. Phai co BIEN TU.
+            if not re.search(r"\\%s(?![A-Za-z])" % re.escape(m), quanh):
+                sai.append((m, re.findall(r"\\[a-z]{1,2}[A-Z]\w*", quanh)[-3:]))
+        kiem(not sai, "B7c cau neo dung DUNG macro cua no",
+             "sai: %s" % sai if sai else "%d/%d cau" % (len(NEO_CAU), len(NEO_CAU)))
+
+    # ---- B8 em-dash, luat nha, ap cho MOI dau ra ----
+    kiem("\u2014" not in than and "\u2014" not in intr, "B8 khong em-dash",
+         "nguon %d, trang in %d" % (than.count("\u2014"), intr.count("\u2014")))
+
+    # ---- B9 abstract: dem tu DA GIAI MACRO ----
+    m = re.search(r"\\begin\{abstract\}(.*?)\\end\{abstract\}",
+                  "\n".join(nguon.values()), re.S)
+    if m:
+        n = len(giai(m.group(1), mac).split())
+        kiem(n <= ABS_MAX, "B9 abstract <= %d tu" % ABS_MAX, "%d tu" % n)
+        con = re.findall(r"\\(?:g|q|bd|n)[A-Z]\w*", giai(m.group(1), mac))
+        kiem(not con, "B9b abstract khong con macro chua giai", str(con[:3]))
+
+    # ---- B10 highlights: <= 85 ky tu moi gach, DA GIAI MACRO ----
+    hp = [q for q in nguon if "frag-highlights" in q]
+    if hp:
+        gach = [giai(x, mac).strip() for x in
+                re.findall(r"\\item\s+(.+?)(?=\n\\item|\n\\end)", nguon[hp[0]], re.S)]
+        gach = [re.sub(r"\s+", " ", g) for g in gach]
+        dai = [(len(g), g[:40]) for g in gach if len(g) > HL_MAX]
+        kiem(3 <= len(gach) <= 5, "B10 co 3 den 5 highlight", "%d gach" % len(gach))
+        kiem(not dai, "B10b moi highlight <= %d ky tu" % HL_MAX,
+             "qua dai: %s" % dai if dai else "dai nhat %d" % max(len(g) for g in gach))
+
+    # ---- B11 cong thuc: moi phuong trinh co nhan phai duoc eqref it nhat mot lan ----
+    nhan = set(re.findall(r"\\label\{(eq:[^}]*)\}", than))
+    ref = set(re.findall(r"\\eqref\{(eq:[^}]*)\}", than))
+    kiem(not (nhan - ref), "B11 khong phuong trinh mo coi",
+         "mo coi: %s" % sorted(nhan - ref) if nhan - ref else "%d/%d duoc eqref"
+         % (len(nhan), len(nhan)))
+
+    # ---- B12 menh de phai co phep DO, khong chi co loi ----
+    md = set(re.findall(r"\\begin\{proposition\}.*?\\label\{(prop:[^}]*)\}", than, re.S))
+    rmd = set(re.findall(r"\\ref\{(prop:[^}]*)\}", than))
+    kiem(not (md - rmd), "B12 moi menh de duoc dan lai o cho khac",
+         "khong dan: %s" % sorted(md - rmd) if md - rmd else "%d menh de" % len(md))
+
+    # ---- B13 hinh va bang: moi tep hinh duoc dung, moi nhan duoc ref ----
+    hinh = set(re.findall(r"\\includegraphics(?:\[[^\]]*\])?\{\.\./figures/([^}]*)\}", than))
+    tren_dia = {os.path.basename(p) for p in glob.glob(os.path.join(GOC, "figures", "*.pdf"))}
+    kiem(hinh <= tren_dia, "B13 moi hinh bai dung deu co tren dia",
+         "thieu: %s" % sorted(hinh - tren_dia) if hinh - tren_dia else "%d hinh" % len(hinh))
+    if tren_dia - hinh:
+        chu_y("hinh tren dia ma bai KHONG dung: %s" % sorted(tren_dia - hinh))
+    for k in ("fig", "tab"):
+        n_ = set(re.findall(r"\\label\{(%s:[^}]*)\}" % k, than))
+        r_ = set(re.findall(r"\\ref\{(%s:[^}]*)\}" % k, than))
+        kiem(not (n_ - r_), "B13%s moi %s duoc dan trong van" % ("c" if k == "fig" else "d", k),
+             "khong dan: %s" % sorted(n_ - r_) if n_ - r_ else "%d/%d" % (len(n_), len(n_)))
+
+    # ---- B14 moi hop thuat toan phai duoc dan trong van ----
+    nalg = set(re.findall(r"\\label\{(alg:[^}]*)\}", than))
+    ralg = set(re.findall(r"\\ref\{(alg:[^}]*)\}", than))
+    kiem(not (nalg - ralg), "B14 moi thuat toan duoc dan trong van",
+         "khong dan: %s" % sorted(nalg - ralg) if nalg - ralg else "%d/%d" % (len(nalg), len(nalg)))
+    kiem(len(nalg) >= 1, "B14b bai co hop thuat toan", "%d hop" % len(nalg))
+
+    # ---- B15 khong hien vat nao chi ton tai mot noi ----
+    # Mot bang sinh ra ma main.tex khong \input la mot bang chet; cong phai thay.
+    import glob as _g
+    tab_dia = {os.path.basename(q)[:-4] for q in _g.glob(os.path.join(RES, "tables", "*.tex"))}
+    tab_dung = set(re.findall(r"\\input\{\.\./results/tables/([^}]*)\}", than))
+    kiem(not (tab_dia - tab_dung), "B15 moi bang sinh ra deu duoc \\input",
+         "bang chet: %s" % sorted(tab_dia - tab_dung) if tab_dia - tab_dung
+         else "%d bang" % len(tab_dia))
+
+    print("\n=> %s (%d loi, %d chu y)  TRANG: %d"
+          % ("DAT" if not loi else "CHUA DAT", len(loi), len(luu), so_trang))
+    return loi
+
+
+def tu_kiem():
+    # ⛔ Danh sach nay PHAI trung danh sach trong `cham()`. Lan dau no thieu fig-luong.tex va
+    #    alg-dp.tex nen ban GOC cua phep tiem tu HONG (B13c, B14), tuc khung tiem bao dong gia
+    #    tren chinh no. Nay lay chung mot nguon de khong the lech nua.
+    goc = {p: doc(p) for p in DANH_SACH_NGUON()}
+    kq = os.path.join(PAPER, "sections", "04-results.tex")
+    hl = os.path.join(PAPER, "frag-highlights.tex")
+    mt = os.path.join(PAPER, "main.tex")
+    f3 = os.path.join(PAPER, "sections", "03-formulation.tex")
+    st_ = os.path.join(PAPER, "sections", "03b-setup.tex")
+
+    def doi(p, old, new):
+        d = dict(goc)
+        assert old in d[p], "⛔ ca tiem khong khop: %s trong %s" % (old[:40], os.path.basename(p))
+        d[p] = d[p].replace(old, new, 1)
+        assert d[p] != goc[p]
+        return d
+
+    ca = [
+        # ⛔ Ca nay PHAI khong co chu so, neu khong B6 bat truoc va B7 van chua duoc chung minh.
+        #    Doi \gNeo thanh mot macro KHAC: so in ra khong con khop CSV, ma khong go so tay nao.
+        ("B7: doi so in ra sang macro khac, khong go chu so",
+         lambda: doi(kq, r"\gNeo\% from the unrestricted optimum",
+                     r"\gNeoTeNhat\% from the unrestricted optimum")),
+        ("B8: tiem mot em-dash",
+         lambda: doi(kq, "The instrument:", "The instrument\u2014")),
+        ("B5: dung macro KHONG ton tai",
+         lambda: doi(kq, r"\gNeoVis{} satellites", r"\gKhongTonTai{} satellites")),
+        ("B6: go mot chu so vao cau ket qua",
+         lambda: doi(kq, "The more useful number", "The 42 more useful number")),
+        ("B10b: lam mot highlight dai hon 85 ky tu",
+         lambda: doi(hl, r"\item Learned policies beat tuned A3 in only \bdWins{} of \bdCells{} regime cells",
+                     r"\item Learned policies beat the tuned standard A3 mechanism in only "
+                     r"\bdWins{} of \bdCells{} regime cells of the latitude by handover cost slice")),
+        ("B9: lam abstract dai hon %d tu" % ABS_MAX,
+         lambda: doi(mt, r"\end{abstract}", ("x " * 120) + "\n\\end{abstract}")),
+        # ⛔ Phai bo eqref cua phuong trinh chi duoc dan DUNG MOT LAN, va thay bang mot thu
+        #    KHONG co chu so, de chinh B11 bat chu khong phai B6.
+        # ⛔ Neo cu la eq:decomp, nhung sau khi them hinh luong thi no duoc eqref o HAI cho,
+        #    nen bo mot cho khong con mo coi va ca tiem im lang. Phai neo vao phuong trinh
+        #    duoc dan DUNG MOT LAN. (Day la lan thu hai neo tiem muc ruong theo bai.)
+        ("B11: bo eqref duy nhat cua eq:branch",
+         lambda: doi(st_, r"the bound \eqref{eq:branch} turns",
+                     r"the branching bound turns")),
+        ("B2: tiem mot \\ref treo",
+         lambda: doi(kq, r"Table~\ref{tab:dai}", r"Table~\ref{tab:khong-co}")),
+    ]
+    print("== Ban GOC ==")
+    if cham(goc):
+        sys.exit("⛔ ban GOC da hong, khong tiem duoc")
+    hong = []
+    for ten, f in ca:
+        print("\n== %s ==" % ten)
+        l = cham(f())
+        print("  => %s" % ("cong BAT duoc" if l else "⛔ cong KHONG bat"))
+        if not l:
+            hong.append(ten)
+    print("\n=> %s (%d/%d ca)" % ("DAT" if not hong else "CHUA DAT",
+                                  len(ca) - len(hong), len(ca)))
+    for h in hong:
+        print("   HONG: %s" % h)
+    return 1 if hong else 0
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--tu-kiem", action="store_true")
+    a = ap.parse_args()
+    if a.tu_kiem:
+        return tu_kiem()
+    print("== Cong bai ==\n")
+    return 1 if cham() else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

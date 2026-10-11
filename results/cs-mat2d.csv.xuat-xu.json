@@ -1,0 +1,33 @@
+{
+ "host": "sol1",
+ "may": "Linux-7.0.0-30-generic-x86_64-with-glibc2.39",
+ "python": "3.11.17",
+ "goi": {
+  "numpy": "2.4.6",
+  "torch": "2.14.1+cpu",
+  "skyfield": "1.54",
+  "sgp4": "2.26",
+  "sklearn": "1.9.1",
+  "matplotlib": "3.11.2"
+ },
+ "commit_kho_goc": null,
+ "ma_bam_code": "e5fd7d344153f76c",
+ "so_tep_ma": 13,
+ "tep_ma": [
+  "code/ablation.py",
+  "code/camera_ready_extra.py",
+  "code/chay_vps.py",
+  "code/cong_ket_qua.py",
+  "code/handover.py",
+  "code/handover_binary.py",
+  "code/make_figures_v2.py",
+  "code/policy_train.py",
+  "code/quet_che_do.py",
+  "code/quet_chinh_sach.py",
+  "code/robustness.py",
+  "code/run_final.py",
+  "code/smoke_g1.py"
+ ],
+ "utc": "2026-10-11T03:19:27.210842+00:00",
+ "nhan_cpu": 80
+}
