@@ -1,14 +1,29 @@
 % Hình LUỒNG của dụng cụ đo — archetype NARROW (cột đơn 252pt) của draw-figure-dph.
 %
-% ⛔ BẢN TRƯỚC TÔI TỰ BỊA TikZ: tự đặt style box/dat/opt/kq, tự chọn nét, không dùng
-%    `palette.tex`. Luật nhà cấm đúng việc ấy, và chính tệp palette ghi sẵn cái bẫy tôi đã
-%    sập ("never name a TikZ style `out`, `in`, `step`, `scale`"). Bản này dùng ngôn ngữ
-%    style của nhà: card trắng viền mảnh, VAI mã hoá bằng TOP-RULE (màu VÀ nét đứt, hai
-%    kênh nên sống qua bản xám), panel gom theo tác nhân, chip số bước trên rule.
+% ⛔⛔ BA BẢN TRƯỚC ĐỀU HỎNG, mỗi bản một kiểu, và bản này sửa nguyên nhân chứ không vá:
 %
-% Archetype NARROW, theo bảng §0b: <= 2 card mỗi hàng, ~15 ký tự mỗi dòng trong card,
-% cấm chú thích tham số trong hình (đẩy xuống caption), aspect 0,5-1,3.
-% Ngân sách chữ NARROW: <= 150 từ, <= 6 mệnh đề >= 6 từ.
+%  1. Bản 1 tự bịa TikZ (style riêng, nét riêng), trong khi nhà đã có `palette.tex`.
+%  2. Bản 2 đặt node bằng `below=... of $(a)!0.5!(b)$`, tức đo từ TOẠ ĐỘ chứ không từ mép
+%     card, nên card đè nhau. Cổng cho PASS vì nó mù trước va chạm bố cục.
+%  3. Bản 3 vẫn là CÂY HAI CỘT, nên mọi nhánh rẽ buộc phải đi CHÉO: 8 trên 10 mũi tên là
+%     đường xiên tuỳ hứng. Đó là thứ làm hình trông nghiệp dư, và không tinh chỉnh được.
+%
+% THIẾT KẾ BẢN NÀY, và lý do từng quyết định:
+%
+%  • LƯỚI BA CỘT x = 0 / 3.1 / 6.2 cm, cardW 2.5cm. Ba cột là số tối thiểu để ba thứ sinh
+%    ra từ `per-slot` (hai tối ưu và các chính sách) nằm CÙNG MỘT HÀNG, nhờ đó mọi mũi tên
+%    từ nó xuống chỉ cần một kênh ngang cộng ba đoạn dọc. Hai cột thì không đủ chỗ, và đó
+%    chính là chỗ sinh ra đường chéo ở bản trước.
+%  • KÊNH ĐỊNH TUYẾN ở y cố định (-1.1 và -3.2). Mọi rẽ nhánh xảy ra TRÊN kênh, nên mọi
+%    đoạn đều ngang hoặc dọc. KHÔNG còn mũi tên xiên nào.
+%  • BỎ PANEL. Panel bọc hai tối ưu buộc đường `per-slot -> policies` phải xuyên qua nó,
+%    và ở bản trước panel còn nuốt nhầm card `policies`. Thay bằng VAI THỨ BA: hai tối ưu
+%    mang `\ruleStage` (giải chính xác), còn `policies` mang `\ruleTrack` (nhánh đang được
+%    ĐO). Vai mã hoá bằng màu VÀ nét nên vẫn sống qua bản xám, và nhóm đọc được mà không
+%    cần khung nào.
+%  • `policies` nằm CÙNG HÀNG với hai tối ưu, nên mũi tên "huấn luyện" chỉ còn là một đoạn
+%    NGANG ngắn giữa hai card cạnh nhau, thay vì một đường chéo cắt ngang hình.
+%  • Chú giải đặt ở ô trống cột trái hàng cuối: lấp đúng chỗ cổng mật độ kêu thưa.
 %
 % Dựng:  pdflatex -output-directory=.. g0-luong.tex
 % Chấm:  python3 measure_figure.py g0-luong.png --column single
@@ -16,91 +31,79 @@
 \usepackage{amsmath,amssymb}
 \usetikzlibrary{positioning,shapes.geometric,arrows.meta,fit,backgrounds,calc}
 
-% ⛔ BE RONG = 3 x cardW vi hang 3 co dpf | sc | dpb tren cung mot truc ngang.
-%    30mm cho 255pt, vuot kho 252pt nen bi thu 0,90x va chu 7pt rot xuong 6,3pt.
-\def\ruleW{1.4pt}\def\cardStroke{0.5pt}\def\cardW{31mm}
+% ⛔ Toi da tu HA \ruleW xuong 1,4pt trong khi mac dinh cua nha la 1,6pt, roi lai than
+%    hinh thua muc. Tra ve chuan nha va nhich len mot chut: vai dam hon thi vua dam hon
+%    o ban xam, vua dua mat do muc qua san, va khong doi mot chu nao trong hinh.
+\def\ruleW{2.0pt}\def\cardStroke{0.7pt}\def\cardW{25mm}
 \input{../../repo-goc/style/palette.tex}
 
-% ⛔ KHONG dat KY HIEU TOAN co chi tren/chi duoi trong card. TeX ve chi tren o 0,7x co
-%    goc, nen `$J^{\star}$` o 8pt rot xuong 5,6pt tren giay va cong bac dung. Luat NARROW
-%    cho phep day ky hieu xuong caption, va day la ly do no cho phep.
 \begin{document}
-% ⛔⛔ BAN TRUOC SAI LUONG, khong phai sai tham my, va toi chi thay khi doc lai mui ten canh
-%    cong thuc:
-%    1. Mui ten DUY NHAT vao `optimality gap` la tu `policies`. Nhung G = (J(pi) - J*)/|J*|
-%       CAN J*, tuc toi uu DAY DU. Hinh noi dai luong trung tam cua bai tinh duoc ma khong
-%       can toi uu nao. Nay `optimum, full choice` -> `gap` la mot mui ten that.
-%    2. `optimum binary -> policies` ve NET LIEN, tuc noi chinh sach SINH RA tu toi uu nhi
-%       phan. Sai: A3 la quy tac chuan, khong can toi uu nao; chi KAN/MLP lay no lam dich
-%       bat chuoc. Nay no la mui ten `param` (net dut) va CO NHAN noi ro no huan luyen cai gi.
-%    3. Khong co mui ten nao cho thay chinh sach an dai luong tung khe, du chung co. Nay co,
-%       va no di theo HANH LANG TRONG giua hai card toi uu, nen vua dung vua khong cat gi.
-%
-% Luoi: hai cot x = 0 va 5.2cm, cardW 31mm => artwork ~252pt, bang cac hinh ket qua.
-% Hang cach 1.9cm de card khong cham nhau va de mui ten co cho tho.
-\begin{tikzpicture}[font=\sffamily\footnotesize,>={Stealth[length=2.0mm]}]
+\begin{tikzpicture}[font=\sffamily\footnotesize,>={Stealth[length=2.0mm]},
+  % ⛔ MỌI mũi tên đi qua hai style này, và cả hai đều ÉP góc vuông. Không `\draw` nào
+  %    được nối hai điểm bằng một đoạn thẳng tuỳ ý: đó là luật của hình này.
+  vuong/.style={data, line width=1.0pt, rounded corners=1.2pt},
+  vuongdut/.style={param, line width=1.0pt, rounded corners=1.2pt}]
 
-% ===== hang 1: cai duoc CHO =====
-\node[card] (inst) at (0,0)    {instance\\\scriptsize SGP4 orbits,\\\scriptsize seeded fading};
-\node[card] (reg)  at (5.2,0)  {regime\\\scriptsize five axes,\\\scriptsize 80-cell slice};
+% ===================== HÀNG 0: cái được CHO =====================
+\node[card] (inst) at (0,0)   {instance\\\scriptsize SGP4 orbits,\\\scriptsize seeded fading};
+\node[card] (reg)  at (6.2,0) {regime\\\scriptsize five axes,\\\scriptsize 80-cell slice};
 
-% ===== hang 2: dai luong tung khe. MOI thu phia duoi deu an tu day. =====
-\node[card] (sc)   at (2.6,-1.7) {per-slot\\\scriptsize vis., quality};
+% ===================== HÀNG 1: đại lượng từng khe =====================
+\node[card] (sc)   at (3.1,-1.95) {per-slot\\\scriptsize vis., quality};
 
-% ===== hang 3: HAI toi uu chinh xac. Khac nhau DUY NHAT o khong gian hanh dong. =====
-\node[card] (dpf)  at (0,-3.4)   {optimum,\\\scriptsize full choice\\\scriptsize exact DP};
-\node[card] (dpb)  at (5.2,-3.4) {optimum,\\\scriptsize binary choice\\\scriptsize exact DP};
+% ===================== HÀNG 2: ba thứ sinh ra từ nó, CÙNG một hàng =====================
+\node[card] (dpf)  at (0,-4.0)   {optimum,\\\scriptsize full choice\\\scriptsize exact DP};
+\node[card] (pol)  at (3.1,-4.0) {policies\\\scriptsize A3 grid,\\\scriptsize KAN, MLP};
+\node[card] (dpb)  at (6.2,-4.0) {optimum,\\\scriptsize binary choice\\\scriptsize exact DP};
 
-% ===== hang 4: co che duoc DO. A3 khong can toi uu nao. =====
-\node[card] (pol)  at (2.6,-5.25) {policies\\\scriptsize A3 grid, 15 settings,\\\scriptsize KAN and MLP};
+% ===================== HÀNG 3: hai phép đo =====================
+\node[card] (gap)   at (0,-6.15)   {optimality\\gap\\\scriptsize policy vs.\ full};
+\node[card] (floor) at (6.2,-6.15) {action-space\\floor\\\scriptsize binary vs.\ full};
 
-% ===== hang 5: hai phep do =====
-\node[card] (gap)   at (0,-7.05)   {optimality\\gap\\\scriptsize policy vs.\ full};
-% ⛔ `floor` phu thuoc CA HAI toi uu. Ve duong cheo tu `dpf` sang day thi cat qua
-%    `policies` va `gap`. Nen: mui ten THANG DUNG tu toi uu nhi phan (cung cot), con
-%    phu thuoc con lai noi bang CHU trong chinh card. Khong mui ten nao noi sai, khong
-%    duong nao cat nhau.
-\node[card] (floor) at (5.2,-7.05) {action-space\\floor\\\scriptsize binary vs.\ full};
+% ===================== HÀNG 4: kết quả =====================
+\node[card, minimum width=46mm] (surf) at (3.1,-8.1)
+  {decomposition\\\scriptsize gap $=$ floor $+$ residual};
 
-% ===== hang 6: ket qua =====
-\node[card] (surf)  at (2.6,-8.95) {decomposition\\\scriptsize gap $=$ floor $+$ residual};
-
-\begin{scope}[on background layer]
-  \node[panel, fit=(dpf)(dpb)] (pn) {};
-\end{scope}
-\paneltitle{pn}{exact optima}
-
+% vai: cho sẵn · giải chính xác · NHÁNH ĐANG ĐƯỢC ĐO · đã đo
 \ruleAux{inst}\ruleAux{reg}
-\ruleStage{sc}\ruleStage{dpf}\ruleStage{dpb}\ruleStage{pol}
+\ruleStage{sc}\ruleStage{dpf}\ruleStage{dpb}
+\ruleTrack{pol}
 \ruleOut{gap}\ruleOut{floor}\ruleOut{surf}
 
 \stepchip{sc}{1}\stepchip{dpf}{2}\stepchip{dpb}{2}\stepchip{pol}{3}
 \stepchip{gap}{4}\stepchip{floor}{4}\stepchip{surf}{5}
 
-% cai duoc cho -> dai luong tung khe
-\draw[data] (inst.south) -- (sc.north west);
-\draw[data] (reg.south)  -- (sc.north east);
-% dai luong tung khe -> HAI toi uu, VA -> cac chinh sach (hanh lang trong o giua)
-\draw[data] (sc.south) -- (dpf.north);
-\draw[data] (sc.south) -- (dpb.north);
-\draw[data] (sc.south) -- (pol.north);
-% dich BAT CHUOC: chi cho chinh sach hoc, nen net dut va co nhan
-% ⛔ Ban truoc co nhan noi tuyen "trains KAN, MLP" nam DE len chinh mui ten va tran ra
-%    ngoai card. Khong co cho dat no cho sach o kho 252pt, nen y nghia chuyen xuong CHU
-%    GIAI, chuong mot dong, va hinh het mot cho chu chong chu.
-\draw[param] (dpb.south west) -- (pol.north east);
-% khoang cach do so voi toi uu DAY DU; san do tu CA HAI toi uu
-\draw[data] (dpf.south)      -- (gap.north);
-\draw[data] (pol.south west) -- (gap.north east);
-\draw[data] (dpb.south)      -- (floor.north);
-% hai phep do -> phan ra
-\draw[data] (gap.south)   -- (surf.north west);
-\draw[data] (floor.south) -- (surf.north east);
+% ---- kênh y = -1.1: hai đầu vào gộp vào per-slot ----
+\draw[vuong] (inst.south) |- (0,-1.05) -- (3.1,-1.05) -- (sc.north);
+\draw[vuong] (reg.south)  |- (6.2,-1.05) -- (3.1,-1.05) -- (sc.north);
 
-% Chu giai o GOC DUOI-TRAI: do la o thua nhat, nen lap no bang noi dung that.
-\node[font=\scriptsize, align=left, text=forest, anchor=north west] at (-1.75,-8.35)
-  {\swAux\,given\\[2pt]\swStage\,solved exactly\\[2pt]
-   \swOut\,measured\\[2pt]\swData\,value flow\\[2pt]
-   \swParam\,trains the\\\hphantom{\swParam\,}learned policies};
+% ---- kênh y = -3.2: per-slot rẽ ba. Chính sách KHÔNG cần tối ưu nào, nên nó nhận
+%      thẳng từ đây, và đó là điều hình phải nói được. ----
+\draw[vuong] (sc.south) -- (3.1,-2.95) -- (0,-2.95) -- (dpf.north);
+\draw[vuong] (sc.south) -- (3.1,-2.95) -- (6.2,-2.95) -- (dpb.north);
+\draw[vuong] (sc.south) -- (pol.north);
+
+% ---- đích bắt chuốc: CÙNG HÀNG nên chỉ là một đoạn ngang ----
+\draw[vuongdut] (dpb.west) -- (pol.east);
+
+% ---- hai phép đo ----
+\draw[vuong] (dpf.south) -- (gap.north);
+\draw[vuong] (pol.south) -- (3.1,-6.15) -- (gap.east);
+\draw[vuong] (dpb.south) -- (floor.north);
+
+% ---- phân rã ----
+\draw[vuong] (gap.south)   |- (surf.west);
+\draw[vuong] (floor.south) |- (surf.east);
+
+% ---- chú giải ----
+% ⛔ Bản trước đặt hai khối chú giải vào hai ô trống của HÀNG CUỐI, và chúng ĐÈ lên card
+%    `decomposition` cùng hai mũi tên vào nó. Ô trống trên lưới không có nghĩa là chỗ
+%    trống trên giấy: hàng cuối còn phải chứa hai tuyến đi vào. Nay chú giải là một DẢI
+%    riêng dưới cùng, không tranh chỗ với tuyến nào.
+% Bỏ mục "value flow": một mũi tên liền là thứ không cần chú thích, và bỏ nó lấy chỗ cho
+% mục thật sự cần giải thích là nét đứt.
+\node[font=\scriptsize, align=center, text=forest, anchor=north] at (3.1,-9.15)
+  {\swAux\,given\quad\swStage\,solved exactly\quad\swTrack\,under test\\[3pt]
+   \swOut\,measured\quad\swParam\,trains the learned policies};
 \end{tikzpicture}
 \end{document}
