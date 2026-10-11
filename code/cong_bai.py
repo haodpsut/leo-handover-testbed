@@ -89,7 +89,6 @@ def DANH_SACH_NGUON():
     return (sorted(glob.glob(os.path.join(PAPER, "sections", "*.tex")))
             + [os.path.join(PAPER, "main.tex"),
                os.path.join(PAPER, "frag-highlights.tex"),
-               os.path.join(PAPER, "fig-luong.tex"),
                os.path.join(PAPER, "alg-dp.tex")])
 
 
@@ -295,6 +294,33 @@ def cham(tep=None):
     kiem(not xau_pc, "B16 khong dau gach cheo truoc % trong hinh",
          "co: %s" % xau_pc if xau_pc else "%d hinh sach"
          % len(glob.glob(os.path.join(GOC, "figures", "*.pdf"))))
+
+    # ---- B18 HINH LUONG phai qua cong hinh luong ----
+    # ⛔ Hinh 1 tung la TikZ noi tuyen, nen KHONG cong nao cham no: `measure_plot` do hinh
+    #    ket qua, con `measure_figure` (cong cua flow figure) thi khong duoc goi bao gio. No
+    #    di toi tan ban gui doc ngoai voi card DE LEN NHAU. Nay no la mot PDF dung rieng va
+    #    phai qua dung cong cua no, giong moi hinh khac.
+    _mf = os.path.join(GOC, "..", "..", "my-skills", "ALL-FIGURES", "0-SKILLS",
+                       "draw-figure-dph", "assets", "measure_figure.py")
+    _pdf = os.path.join(GOC, "figures", "g0-luong.pdf")
+    if os.path.exists(_mf) and os.path.exists(_pdf):
+        import fitz as _f2
+        import tempfile as _tf
+        _dd = _tf.mkdtemp(prefix="cong-luong-")
+        try:
+            _d2 = _f2.open(_pdf)
+            _d2[0].get_pixmap(dpi=330).save(os.path.join(_dd, "g0-luong.png"))
+            _d2.close()
+            shutil.copy(_pdf, os.path.join(_dd, "g0-luong.pdf"))
+            _r2 = subprocess.run([sys.executable, _mf, os.path.join(_dd, "g0-luong.png"),
+                                  "--column", "single"], capture_output=True, text=True)
+            _l = [x for x in _r2.stdout.splitlines() if x.startswith("COMPOSITION")]
+            kiem(_r2.returncode == 0, "B18 hinh luong qua cong measure_figure",
+                 (_l[-1] if _l else "ma tra ve %d" % _r2.returncode))
+        finally:
+            shutil.rmtree(_dd, ignore_errors=True)
+    else:
+        chu_y("B18 bo qua: khong thay measure_figure.py hoac g0-luong.pdf")
 
     # ---- B15 khong hien vat nao chi ton tai mot noi ----
     # Mot bang sinh ra ma main.tex khong \input la mot bang chet; cong phai thay.

@@ -1,0 +1,93 @@
+% Hình LUỒNG của dụng cụ đo — archetype NARROW (cột đơn 252pt) của draw-figure-dph.
+%
+% ⛔ BẢN TRƯỚC TÔI TỰ BỊA TikZ: tự đặt style box/dat/opt/kq, tự chọn nét, không dùng
+%    `palette.tex`. Luật nhà cấm đúng việc ấy, và chính tệp palette ghi sẵn cái bẫy tôi đã
+%    sập ("never name a TikZ style `out`, `in`, `step`, `scale`"). Bản này dùng ngôn ngữ
+%    style của nhà: card trắng viền mảnh, VAI mã hoá bằng TOP-RULE (màu VÀ nét đứt, hai
+%    kênh nên sống qua bản xám), panel gom theo tác nhân, chip số bước trên rule.
+%
+% Archetype NARROW, theo bảng §0b: <= 2 card mỗi hàng, ~15 ký tự mỗi dòng trong card,
+% cấm chú thích tham số trong hình (đẩy xuống caption), aspect 0,5-1,3.
+% Ngân sách chữ NARROW: <= 150 từ, <= 6 mệnh đề >= 6 từ.
+%
+% Dựng:  pdflatex -output-directory=.. g0-luong.tex
+% Chấm:  python3 measure_figure.py g0-luong.png --column single
+\documentclass[tikz,border=2pt]{standalone}
+\usepackage{amsmath,amssymb}
+\usetikzlibrary{positioning,shapes.geometric,arrows.meta,fit,backgrounds,calc}
+
+% ⛔ BE RONG = 3 x cardW vi hang 3 co dpf | sc | dpb tren cung mot truc ngang.
+%    30mm cho 255pt, vuot kho 252pt nen bi thu 0,90x va chu 7pt rot xuong 6,3pt.
+\def\ruleW{1.4pt}\def\cardStroke{0.5pt}\def\cardW{31mm}
+\input{../../repo-goc/style/palette.tex}
+
+% ⛔ KHONG dat KY HIEU TOAN co chi tren/chi duoi trong card. TeX ve chi tren o 0,7x co
+%    goc, nen `$J^{\star}$` o 8pt rot xuong 5,6pt tren giay va cong bac dung. Luat NARROW
+%    cho phep day ky hieu xuong caption, va day la ly do no cho phep.
+\begin{document}
+% ⛔⛔ BAN TRUOC DAT NODE BANG `below=6mm of $(a)!0.5!(b)$`, tuc do 6mm tu MOT TOA DO chu
+%    khong tu MEP CARD, nen cac card DE LEN NHAU. `measure_figure` cho PASS (ink, aspect,
+%    co chu deu dat) vi no mu truoc va cham bo cuc. Chi mat nhin anh render moi thay. Nay
+%    dat tren LUOI TOA DO tuong minh, dung nhu template cua nha lam.
+%    Luoi: hai cot x = 0 va 5.2cm, cardW 31mm, nen artwork ~252pt = dung kho cac hinh
+%    ket qua, va ca bo hinh cua bai dat cung mot be rong.
+\begin{tikzpicture}[font=\sffamily\footnotesize,>={Stealth[length=2.0mm]}]
+
+% ===== hang 0: cai duoc CHO =====
+\node[card] (inst) at (0,0)    {instance\\\scriptsize SGP4 orbits,\\\scriptsize seeded fading};
+\node[card] (reg)  at (5.2,0)  {regime\\\scriptsize five axes,\\\scriptsize 80-cell slice};
+
+% ===== hang 1: dai luong tung khe =====
+\node[card] (sc)   at (2.6,-1.7) {per-slot\\\scriptsize vis., quality};
+
+% ===== hang 2: HAI toi uu chinh xac. Khac nhau DUY NHAT o khong gian hanh dong. =====
+\node[card] (dpf)  at (0,-3.4)   {optimum,\\\scriptsize full choice};
+\node[card] (dpb)  at (5.2,-3.4) {optimum,\\\scriptsize binary choice};
+
+% ===== hang 3: san do tu hai toi uu | cac chinh sach, deu bi nhot o khong gian nhi phan =====
+\node[card] (floor) at (0,-5.15)   {action-space\\floor};
+\node[card] (pol)   at (5.2,-5.15) {policies\\\scriptsize A3 grid, 15 settings,\\\scriptsize KAN and MLP};
+
+% ===== hang 4: khoang cach cua tung chinh sach =====
+\node[card] (gap)   at (5.2,-6.9) {optimality\\gap};
+
+% ===== hang 5: ket qua =====
+\node[card] (surf)  at (2.6,-8.65) {decomposition\\\scriptsize gap $=$ floor $+$ residual};
+
+% ⛔⛔ TOI DA THEM PANEL THU HAI "what is reported" quanh (floor)(gap)(surf) de chua loi
+%    TOO SPARSE. Nhin anh render moi thay no NUOT NHAM card `policies` nam giua hai cot,
+%    tuc khung noi mot dieu SAI: chinh sach khong phai thu duoc bao. Mot khung sai nghia
+%    te hon mot hinh thua cho trong. Bo no, va bu mat do bang NOI DUNG THAT (con so quy mo
+%    tren hai card), dung nhu cong goi y: "add real content".
+\begin{scope}[on background layer]
+  \node[panel, fit=(dpf)(dpb)] (pn) {};
+\end{scope}
+\paneltitle{pn}{exact optima}
+
+\ruleAux{inst}\ruleAux{reg}
+\ruleStage{sc}\ruleStage{dpf}\ruleStage{dpb}\ruleStage{pol}
+\ruleOut{floor}\ruleOut{gap}\ruleOut{surf}
+
+\stepchip{sc}{1}\stepchip{dpf}{2}\stepchip{dpb}{2}\stepchip{pol}{3}
+\stepchip{floor}{4}\stepchip{gap}{4}\stepchip{surf}{5}
+
+\draw[data] (inst.south) -- (sc.north west);
+\draw[data] (reg.south)  -- (sc.north east);
+\draw[data] (sc.south)   -- (dpf.north);
+\draw[data] (sc.south)   -- (dpb.north);
+\draw[data] (dpf.south)  -- (floor.north);
+\draw[data] (dpb.south west) -- (floor.north east);
+\draw[data] (dpb.south)  -- (pol.north);
+\draw[data] (pol.south)  -- (gap.north);
+\draw[data] (floor.south) -- (surf.north west);
+\draw[data] (gap.south)   -- (surf.north east);
+
+% Chu giai dung TU SWATCH cua nha, khong ve tay.
+% ⛔ Dat o GOC DUOI-TRAI chu khong o duoi cung: do dung la o cong do thua nhat (3,8% muc,
+%    can bang goc 2,5x). Chu giai la noi dung that, nen lap cho trong bang no thi vua chua
+%    loi mat do vua khong phai bia them gi.
+\node[font=\scriptsize, align=left, text=forest, anchor=north west] at (-1.75,-7.55)
+  {\swAux\,given\\[2pt]\swStage\,solved exactly\\[2pt]
+   \swOut\,measured\\[2pt]\swData\,value flow};
+\end{tikzpicture}
+\end{document}
