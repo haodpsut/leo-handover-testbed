@@ -572,7 +572,10 @@ def b_chinh(a3, cs, ten_tep):
                 continue
             v = a3[cd]
             k = cs.get(cd, {})
-            f.write("%s & (%g, %d) & %.2f & %.2f & %s & %s & %.2f \\\\\n"
+            # ⛔ Phan bien ngoai vong 2: bang nay in 0,11 va 0,06 o HAI chu so, trong khi
+            #    §5.4 dan 0,109 va 0,058 de doc gia chia ra 53,2%. Hai cho noi ve CUNG mot
+            #    che do o hai do chinh xac thi phep chia khong kiem lai duoc. Nay BA chu so.
+            f.write("%s & (%g, %d) & %.3f & %.3f & %s & %s & %.2f \\\\\n"
                     % (ten, v["hys"], v["ttt"], v["gap"], v["gia"],
                        ("%.2f" % k["KAN"]) if "KAN" in k else "n/a",
                        ("%.2f" % k["MLP"]) if "MLP" in k else "n/a", v["msinr"]))
@@ -705,12 +708,30 @@ def b_doi_chieu(ten_tep):
     print("  -> %s" % os.path.join("results/tables", ten_tep))
 
 
+def doi_chung_hai_luot():
+    """Đối chứng hai lượt quét: số hàng giao nhau, và số hàng lệch (phải là 0).
+
+    Đây là bằng chứng thay cho câu "một mã băm" mà bài từng khai sai: mã băm tính trên TẬP
+    TỆP nên nó đổi khi một lượt quét thêm bộ chạy của riêng nó, còn cái đáng hỏi là mã dùng
+    chung có cho ra cùng một số không.
+    """
+    n = l = 0
+    for a_, b_ in (("vps-ofat.csv", "cs-ofat.csv"), ("vps-mat2d.csv", "cs-mat2d.csv")):
+        A = {(x["che_do"], x["seed"]): (x["J_opt"], x["J_bin"]) for x in (tai(a_) or [])}
+        B = {(x["che_do"], x["seed_test"]): (x["J_opt"], x["J_bin"]) for x in (tai(b_) or [])}
+        gi = set(A) & set(B)
+        n += len(gi); l += sum(1 for k in gi if A[k] != B[k])
+    return n, l
+
+
 def b_dung_cu(of_hang, ten_tep):
     """Bảng DỤNG CỤ: các bất biến của phép đo và giá trị ĐO ĐƯỢC của chúng.
 
     Đây là bảng một phản biện khó tính muốn thấy đầu tiên: không phải kết quả, mà bằng chứng
     rằng cái máy đo không hỏng. Mọi ô tính lại từ CSV, không ô nào gõ tay.
     """
+    _n, _l = doi_chung_hai_luot()
+    _giao = "%s rows, %d" % ("{:,}".format(_n).replace(",", "\\,"), _l)
     nhi = [x for x in of_hang if x["khong_gian"] == "binary"]
     lech = [abs(float(x["gap_pct"]) - float(x["gia_rut_gon"]) - float(x["gap_vs_bin"]))
             for x in nhi]
@@ -733,6 +754,11 @@ def b_dung_cu(of_hang, ten_tep):
          "max residual", "%.2e" % (max(lech) if lech else 0.0), "$\\le 2\\cdot 10^{-6}$"),
         ("every returned schedule re-evaluated independently",
          "mismatches", "0", "$0$"),
+        # ⛔ Phan bien ngoai vong 2: phep doi chung hai luot quet duoc KE trong van xuoi nhung
+        #    VANG MAT khoi dung cai bang sinh ra de ghi cac bat bien. Mot bang bat bien thieu
+        #    mot bat bien la mot bang noi thieu.
+        ("the two sweeps agree on the quantities both compute",
+         "rows, deviations", _giao, "$0$"),
     ]
     with io.open(os.path.join(TAB, ten_tep), "w", encoding="utf-8") as f:
         f.write(SINH)
