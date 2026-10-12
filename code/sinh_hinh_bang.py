@@ -103,6 +103,18 @@ def nhan_thua(ax, vi):
     ax.set_xticks(chon); ax.set_xticklabels(["%g" % v for v in chon])
 
 
+# ⛔⛔ DANH SACH BANG va HINH phai KHAI O DAY, khong duoc suy ra bang `os.listdir`.
+#    `qBang` tung tinh bang cach dem tep .tex trong results/tables NGAY TRONG khoi macro,
+#    tuc TRUOC khi cac bang duoc ghi. Tren may toi no ra 8 — nhung chi vi 8 bang cua LAN
+#    CHAY TRUOC con nam tren dia. Trong mot clone sach no ra **0**. Con so ay chua bao gio
+#    la phep do cua lan chay hien tai, va chi lo ra khi that su chay o cho sach.
+#    Nay no la so phan tu cua danh sach ma `main()` DUYET, nen hai thu khong the lech.
+BANG = ["tab-ky-hieu.tex", "tab-che-do.tex", "tab-doi-chieu.tex", "tab-chinh.tex",
+        "tab-dai-luoi.tex", "tab-dung-cu.tex", "tab-xuat-xu.tex", "tab-tham-so.tex"]
+# Hinh luong ve bang TikZ ngoai bo sinh nay, nen no duoc KHAI chu khong duoc dem.
+HINH_TIKZ = ["g0-luong.pdf"]
+
+
 def _ti2(tu, mau):
     """Ti so tinh tu gia tri DA LAM TRON nhu bai in, 2 chu so thap phan.
 
@@ -889,7 +901,7 @@ def b_tham_so_toi_uu(a3, ten_tep):
     print("  -> %s" % os.path.join("results/tables", ten_tep))
 
 
-def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
+def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep, so_hinh_ve):
     """Sinh MACRO cho mọi con số §Results dùng. Mỗi số có MỘT chỗ ở.
 
     ⛔ Lớp lỗi "số headline không có một chỗ ở" đã đếm được 49% số trong một bài là gõ tay. Nên
@@ -1113,14 +1125,24 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep):
     dat("gLechMay", 100.0 * (_b - _a) / _a, "%.2f")
     # --- hien vat: SHA kho cong khai, so hinh, so bang. ⛔ Ba con so nay TUNG bi go tay o
     #     ban dau, va mot trong ba (SHA) doi moi lan day kho, nen go tay la bao dam sai.
-    dat("qHinh", len([q for q in os.listdir(FIG) if q.endswith(".pdf")]), "%d")
-    dat("qBang", len([q for q in os.listdir(TAB) if q.endswith(".tex")]), "%d")
-    sha = subprocess.run(["git", "-C", os.path.join(GOC, "repo-goc"), "rev-parse", "--short=7",
-                          "HEAD"], capture_output=True, text=True)
-    if sha.returncode == 0 and sha.stdout.strip():
-        dat("repoSha", sha.stdout.strip(), "%s")
-    else:
-        raise SystemExit("⛔ khong lay duoc SHA kho, khong duoc go tay vao bai")      # n của test; train cùng cỡ
+    dat("qBang", len(BANG), "%d")
+    # So hinh = so hinh ket qua bo sinh nay ve (truyen vao) + so hinh TikZ duoc khai.
+    dat("qHinh", so_hinh_ve + len(HINH_TIKZ), "%d")
+    # ⛔⛔ DUONG DAN CO DINH `GOC/repo-goc` lam BO SINH DUNG trong mot clone sach, vi o
+    #    day kho la cay BAI chua kho con, con trong clone thi clone CHINH LA kho. §Data
+    #    khai "mot clone sach sinh lai duoc moi hinh va bang", va loi nay lam cau ay SAI.
+    #    Chi lo ra khi thuc su giai nen ra cho sach roi chay — dung lop loi "QA xanh vi
+    #    khong thu dung lai" cua so nha. Nay thu CA HAI cho.
+    sha = None
+    for _d in (os.path.join(GOC, "repo-goc"), GOC):
+        _r = subprocess.run(["git", "-C", _d, "rev-parse", "--short=7", "HEAD"],
+                            capture_output=True, text=True)
+        if _r.returncode == 0 and _r.stdout.strip():
+            sha = _r.stdout.strip()
+            break
+    if not sha:
+        raise SystemExit("⛔ khong lay duoc SHA kho, khong duoc go tay vao bai")
+    dat("repoSha", sha, "%s")
     dat("qCheDo", len(a3), "%d")
     dat("qLuoi", len(A3), "%d")
     # ⛔⛔ TEN LENH LaTeX CHI DUOC CHUA CHU CAI. Ban dau toi dat `\gL025`, `\gPd0`,
@@ -1183,16 +1205,23 @@ def main():
     print("\n== Macro ==")
     sinh_macro(a3, cs_of, (a3_theo_che_do(m2) if m2 else None),
                (cs_theo_che_do(tai("cs-mat2d.csv") or []) if m2 else None),
-               of, "so-lieu.tex")
+               of, "so-lieu.tex", len(ok))
     print("\n== Bang ==")
-    b_ky_hieu("tab-ky-hieu.tex")
-    b_che_do(a3, "tab-che-do.tex")
-    b_doi_chieu("tab-doi-chieu.tex")
-    b_chinh(a3, cs_of, "tab-chinh.tex")
-    b_dai_luoi(a3, "tab-dai-luoi.tex")
-    b_dung_cu(of, "tab-dung-cu.tex")
-    b_xuat_xu("tab-xuat-xu.tex")
-    b_tham_so_toi_uu(a3, "tab-tham-so.tex")
+    _viec = {
+        "tab-ky-hieu.tex":  lambda f: b_ky_hieu(f),
+        "tab-che-do.tex":   lambda f: b_che_do(a3, f),
+        "tab-doi-chieu.tex": lambda f: b_doi_chieu(f),
+        "tab-chinh.tex":    lambda f: b_chinh(a3, cs_of, f),
+        "tab-dai-luoi.tex": lambda f: b_dai_luoi(a3, f),
+        "tab-dung-cu.tex":  lambda f: b_dung_cu(of, f),
+        "tab-xuat-xu.tex":  lambda f: b_xuat_xu(f),
+        "tab-tham-so.tex":  lambda f: b_tham_so_toi_uu(a3, f),
+    }
+    # ⛔ Phep kiem nay la ly do BANG dang o muc module: neu ai them mot bang vao day ma
+    #    quen khai, hoac khai ma quen viet, `qBang` se sai va khong ai biet.
+    assert sorted(_viec) == sorted(BANG), "⛔ BANG lech danh sach bang that sinh ra"
+    for _f in BANG:
+        _viec[_f](_f)
     print("\n=> %d/%d hinh dat" % (sum(1 for x in ok if x), len(ok)))
     return 0 if all(ok) else 1
 

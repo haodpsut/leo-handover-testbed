@@ -36,8 +36,13 @@ A3 = ["a3_%g_%d" % (h, t) for h, t in itertools.product(HYS, TTT)]
 NGOAI = {
     "repoSha":   "git rev-parse trong repo-goc, kiểm bởi cong_bai B?/đối chiếu ls-remote",
     "nDeXuat":   "đếm khoá \\citep giữa hai mốc trong 02-related.tex, bởi cong_van_lieu",
-    "qHinh":     "đếm tệp .pdf trong figures/",
-    "qBang":     "đếm tệp .tex trong results/tables/",
+    # ⛔ Hai mục này KHÔNG còn là "đếm tệp trên đĩa". Đếm trên đĩa đo LẦN CHẠY TRƯỚC:
+    #    `qBang` lấy trong khối macro, tức trước khi bảng được ghi, nên ở một clone sạch
+    #    nó ra 0 còn trên máy tôi nó ra 8 chỉ vì bảng cũ còn đó. Nay cả hai là KHAI BÁO
+    #    trong bộ sinh (`BANG`, `HINH_TIKZ`) và phép S-art dưới đây đối chiếu khai báo ấy
+    #    với số tệp THỰC SỰ có, nên sai lệch không im lặng được.
+    "qHinh":     "khai báo trong sinh_hinh_bang.BANG/HINH_TIKZ, đối chiếu ở phép S-art",
+    "qBang":     "khai báo trong sinh_hinh_bang.BANG, đối chiếu ở phép S-art",
     "qSeedTrain": "số hạt giống test mỗi chế độ, đếm từ CSV (kiểm ở TRUC_TIEP)",
     "gLechMay":  "tính từ results/do-lech-may.json, hai tổng trọng số trên hai host",
 }
@@ -313,6 +318,21 @@ def cham(mac=None):
 
     m = mac if mac is not None else macro()
     R, DAN = tinh_lai()
+
+    # ---- S-art: so HINH/BANG bai khai phai bang so tep THUC SU co tren dia ----
+    # ⛔ Doi chung HAI CHIEU: bo sinh khai, dia co. Khai thieu thi bai dan mot hinh khong
+    #    ton tai; dia co thua thi co hien vat khong ai dan. Phep nay bat ca hai.
+    _fig = os.path.join(GOC, "figures")
+    _tab = os.path.join(RES, "tables")
+    _co_f = sorted(q for q in os.listdir(_fig) if q.endswith(".pdf")) if os.path.isdir(_fig) else []
+    _co_b = sorted(q for q in os.listdir(_tab) if q.endswith(".tex")) if os.path.isdir(_tab) else []
+    _lech = []
+    if "qHinh" in m and len(_co_f) != int(m["qHinh"]):
+        _lech.append("qHinh khai %s, dia co %d" % (m["qHinh"], len(_co_f)))
+    if "qBang" in m and len(_co_b) != int(m["qBang"]):
+        _lech.append("qBang khai %s, dia co %d" % (m["qBang"], len(_co_b)))
+    kiem(not _lech, "S-art so hinh/bang bai khai khop so tep tren dia",
+         "; ".join(_lech) if _lech else "%d hinh, %d bang" % (len(_co_f), len(_co_b)))
 
     # ---- S1 moi macro TRUC TIEP phai khop phep tinh lai doc lap ----
     lech = []
