@@ -45,9 +45,17 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GOC = os.path.dirname(HERE)
-for p in (os.path.join(GOC, "code"), os.path.join(GOC, "repo-goc", "code")):
-    if os.path.isdir(p) and p not in sys.path:
-        sys.path.insert(0, p)
+# ⛔⛤ CAY LAM VIEC PHAI THANG CAY TRONG KHO. Hai ban cua cung mot tep ton tai: `code/`
+#    (dang sua) va `repo-goc/code/` (hien vat da cong bo). Mot vong `sys.path.insert(0, ...)`
+#    thi cai CHEN SAU dung TRUOC, nen tuy thu tu liet ke ma ban nao che ban nao — va mot ban
+#    CU trong kho da che ban dang sua, bao loi "khong import duoc ham vua them". Dat tuong
+#    minh: kho di truoc trong danh sach, roi cay lam viec duoc nhet len dau SAU CUNG.
+for _p in (os.path.join(GOC, "repo-goc", "code"), os.path.join(GOC, "code")):
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
+if os.path.isdir(os.path.join(GOC, "code")):
+    sys.path.remove(os.path.join(GOC, "code"))
+    sys.path.insert(0, os.path.join(GOC, "code"))
 import handover as H                                       # noqa: E402
 from camera_ready_extra import a3_ttt                      # noqa: E402
 from quet_che_do import NEO, HYS, TTT, gap, ten_che_do     # noqa: E402
@@ -126,10 +134,16 @@ def xuat_xu():
 KHONG_GIAN = {"max-sinr": "full", "max-elev": "full"}        # con lai (a3_*) la "binary"
 
 
-def _mot_diem_a3(kw, seed):
-    """DP đầy đủ + DP nhị phân + heuristic + toàn lưới A3, cho MỘT chế độ và MỘT seed."""
+def _mot_diem_a3(kw, seed, lon=0.0):
+    """DP đầy đủ + DP nhị phân + heuristic + toàn lưới A3, cho MỘT chế độ và MỘT thực thể.
+
+    `lon` xoay KINH ĐỘ trạm, tức lấy một mẫu hình học khác của cùng chế độ. Vĩ độ do chế
+    độ quyết định và không bị đụng tới.
+    """
     import handover_binary as HB
     p = dict(NEO); p.update(kw)
+    lat = p["station"][0]
+    p["station"] = (lat, lon)
     sc = H.build_scenario(seed=seed, **p)
     J_opt, _ = H.dp_optimum(sc)
     _V, _ex, serv_bin = HB.solve_dp(sc)
@@ -145,14 +159,15 @@ def _mot_diem_a3(kw, seed):
 
 
 def viec_a3(dv):
-    """dv = (ten_viec, nhan_che_do, kw, seed, vai). Trả về các dòng CSV."""
-    ten, nhan, kw, seed, vai = dv
-    r = _mot_diem_a3(kw, seed)
+    """dv = (ten_viec, nhan_che_do, kw, seed, vai, kinh_do). Trả về các dòng CSV."""
+    ten, nhan, kw, seed, vai, lon = dv
+    r = _mot_diem_a3(kw, seed, lon)
     hang = []
     for k in ["max-sinr", "max-elev"] + ["a3_%g_%d" % (h, t)
                                          for h, t in itertools.product(HYS, TTT)]:
         e = r[k]
-        hang.append(dict(viec=ten, che_do=nhan, vai=vai, seed=seed, chinh_sach=k,
+        hang.append(dict(viec=ten, che_do=nhan, vai=vai, seed=seed, kinh_do=lon,
+                         chinh_sach=k,
                          khong_gian=KHONG_GIAN.get(k, "binary"),
                          gap_pct=round(gap(e["J"], r["J_opt"]), 6),
                          # ⛔ CUNG MOT MAU SO |J_opt| cho ca ba khoang cach. Ban dau toi dung
@@ -174,9 +189,38 @@ def viec_a3(dv):
 
 # ----------------------------- danh sách việc --------------------------------
 
+# ⛔⛔ HINH HOC PHAI DUOC LAY MAU LAI. Hoi dong G6 (12/10) bat duoc: `build_scenario` chi
+#    gieo PHA DINH; thoi diem quan sat va kinh do tram la hang so viet cung, nen
+#    `max|el(seed 0) - el(seed 100)| = 0`. Voi mot truc HINH HOC nhu vi do hay mat do thi
+#    toan bo bo quet cu la **n = 1**, va khong co thanh sai so nao ton tai. Phan bien lay
+#    mau lai bang cach xoay kinh do: o 70 do khoang cach trai tu 2,24% den 5,53%, tuc con
+#    so cu nam gan DAY phan bo cua chinh no.
+#
+#    Nay mot THUC THE = mot cap (hinh hoc, pha dinh). Hinh hoc lay bang cach xoay kinh do
+#    tram 360/G do: voi vo Walker, xoay kinh do doi hoan toan ve tinh nao o tren dau, nen
+#    day la mot phep lay mau hinh hoc that chu khong phai doi nhan.
+#    ⛔ Khong dong vao `repo-goc/code/handover.py`: `build_scenario` da nhan `station=(lat,lon)`,
+#    nen phep lay mau nay khong sua gi trong bo mo phong da cong bo.
+#
+#    NGAN SACH GIU NGUYEN: truoc la 40 hat giong pha dinh tren 1 hinh hoc; nay la
+#    G=8 hinh hoc x 5 hat giong pha dinh = 40 thuc the moi vai. Cung so don vi, nhung
+#    phuong sai do duoc nay gom ca phan hinh hoc, la phan tung bi giau hoan toan.
+G_HINH = 8
+
+
+def _bo_thuc_the(n_train, n_test):
+    """Tra ve [(vai, seed, kinh_do)], G hinh hoc x (n/G) hat giong pha dinh moi vai."""
+    f_tr = max(1, n_train // G_HINH)
+    f_te = max(1, n_test // G_HINH)
+    tr = [("train", s, 360.0 * g / G_HINH)
+          for g in range(G_HINH) for s in range(f_tr)]
+    te = [("test", s, 360.0 * g / G_HINH)
+          for g in range(G_HINH) for s in range(100, 100 + f_te)]
+    return tr, te
+
+
 def don_vi(viec, n_train, n_test):
-    tr = [("train", s) for s in range(n_train)]
-    te = [("test", s) for s in range(100, 100 + n_test)]
+    tr, te = _bo_thuc_the(n_train, n_test)
     from quet_che_do import TRUC
     if viec == "ofat":
         diem = [("neo", {})] + [(ten_che_do(kw), kw) for t in TRUC for kw in TRUC[t]]
@@ -186,10 +230,10 @@ def don_vi(viec, n_train, n_test):
             if nhan in thay:
                 continue
             thay.add(nhan); ds.append((nhan, kw))
-        return [("ofat", nhan, kw, s, vai) for nhan, kw in ds for vai, s in tr + te]
+        return [("ofat", nhan, kw, s, vai, lon) for nhan, kw in ds for vai, s, lon in tr + te]
     if viec == "mat2d":
-        return [("mat2d", "vido=%g+lam3=%g" % (v, c), dict(station=(v, 0.0), lam3=c), s, vai)
-                for v in VI_DO_2D for c in GIA_HO_2D for vai, s in tr + te]
+        return [("mat2d", "vido=%g+lam3=%g" % (v, c), dict(station=(v, 0.0), lam3=c), s, vai, lon)
+                for v in VI_DO_2D for c in GIA_HO_2D for vai, s, lon in tr + te]
     raise SystemExit("⛔ viec khong biet: %s" % viec)
 
 
@@ -204,7 +248,10 @@ def da_lam(ra):
     if not os.path.exists(ra):
         return set()
     with io.open(ra, encoding="utf-8") as f:
-        return {(r["che_do"], r["vai"], r["seed"]) for r in csv.DictReader(f)}
+        # ⛔ KHOA PHAI GOM CA KINH DO. Mot thuc the nay la (che do, vai, hat giong, hinh
+        #    hoc); bo kinh do ra thi chay tiep se coi 8 mau hinh hoc la MOT va bo sot 7.
+        return {(r["che_do"], r["vai"], r["seed"], r.get("kinh_do", ""))
+                for r in csv.DictReader(f)}
 
 
 def main():
@@ -227,13 +274,24 @@ def main():
         loi += [] if ok else ["omp"]
         # 2. chay lai phai TIEP TUC: don vi da lam bi bo qua
         ra = os.path.join(RES, "_tu-kiem.csv")
-        io.open(ra, "w", encoding="utf-8").write("che_do,vai,seed\nneo,test,100\n")
+        io.open(ra, "w", encoding="utf-8").write(
+            "che_do,vai,seed,kinh_do\nneo,test,100,45.0\n")
         d = da_lam(ra)
-        ok2 = ("neo", "test", "100") in d
+        ok2 = ("neo", "test", "100", "45.0") in d
         print("  %s tu-kiem 2: doc duoc don vi da lam tu tep ra  [%d don vi]"
               % ("DAT " if ok2 else "HONG", len(d)))
-        os.remove(ra)
         loi += [] if ok2 else ["tiep-tuc"]
+        # 2b. khoa phai KHOP VONG KHU HOI: cach bo chay sinh khoa == cach CSV ghi ra
+        dv0 = don_vi("ofat", 8, 8)[0]
+        khoa_sinh = (dv0[1], dv0[4], str(dv0[3]), str(dv0[5]))
+        io.open(ra, "w", encoding="utf-8").write(
+            "che_do,vai,seed,kinh_do\n%s,%s,%s,%s\n"
+            % (dv0[1], dv0[4], dv0[3], dv0[5]))
+        ok2b = khoa_sinh in da_lam(ra)
+        os.remove(ra)
+        print("  %s tu-kiem 2b: khoa tiep-tuc khop vong khu hoi  [%s]"
+              % ("DAT " if ok2b else "HONG", khoa_sinh))
+        loi += [] if ok2b else ["khoa-khu-hoi"]
         # 3. xuat xu phai co host va phien ban
         x = xuat_xu()
         ok3 = bool(x["host"]) and x["goi"].get("numpy")
@@ -247,7 +305,10 @@ def main():
     ra = os.path.join(RES, "vps-%s.csv" % a.viec)
     dv = don_vi(a.viec, a.n_train, a.n_test)
     xong = da_lam(ra)
-    con = [d for d in dv if (d[1], d[4], str(d[3])) not in xong]
+    # ⛔ Dung `str()` chu khong `"%g"`: CSV ghi `45.0` con `"%g" % 45.0` cho `45`, nen khoa
+    #    khong bao gio khop va chay tiep se lam lai TAT CA. An toan nhung vo ich, va kieu
+    #    sai lech nay chi lo ra khi so hai chuoi that.
+    con = [d for d in dv if (d[1], d[4], str(d[3]), str(d[5])) not in xong]
     print("== chay_vps: viec=%s  %d don vi, %d da lam, %d con lai, %d nhan =="
           % (a.viec, len(dv), len(dv) - len(con), len(con), a.nhan))
     # ⛔ GHI XUAT XU TRUOC moi loi ra som. Ban dau no nam SAU `if not con: return`, nen mot

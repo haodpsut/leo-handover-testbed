@@ -38,9 +38,16 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GOC = os.path.dirname(HERE)
-for p in (os.path.join(GOC, "repo-goc", "code"), os.path.join(GOC, "code")):
-    if os.path.isdir(p):
-        sys.path.insert(0, p)
+# ⛔⛔ CAY LAM VIEC PHAI THANG CAY TRONG KHO. Hai ban cua cung mot tep ton tai: `code/`
+#    (dang sua) va `repo-goc/code/` (hien vat da cong bo). `sys.path.insert(0, ...)` trong
+#    mot vong thi cai CHEN SAU dung TRUOC, nen thu tu liet ke quyet dinh ban nao che ban
+#    nao — va mot ban CU trong kho da che ban dang sua. Dat tuong minh.
+for _p in (os.path.join(GOC, "repo-goc", "code"), os.path.join(GOC, "code")):
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
+if os.path.isdir(os.path.join(GOC, "code")):
+    sys.path.remove(os.path.join(GOC, "code"))
+    sys.path.insert(0, os.path.join(GOC, "code"))
 import handover as H                                    # noqa: E402
 from camera_ready_extra import a3_ttt                   # noqa: E402
 

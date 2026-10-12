@@ -1,0 +1,144 @@
+[
+ {
+  "id": "gCostHigh",
+  "paper_value": "2.33",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "lam3=4.0",
+   "vai": "test",
+   "chinh_sach": "a3_4_1"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gCostLow",
+  "paper_value": "0.71",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "lam3=0.25",
+   "vai": "test",
+   "chinh_sach": "a3_1_1"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gFadeHigh",
+  "paper_value": "0.52",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "fading_db=6.0",
+   "vai": "test",
+   "chinh_sach": "a3_2_1"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gFadeMid",
+  "paper_value": "0.86",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "neo",
+   "vai": "test",
+   "chinh_sach": "a3_2_1"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gLatLow",
+  "paper_value": "0.46",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "station=15.0",
+   "vai": "test",
+   "chinh_sach": "a3_2_1"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gLatPolar",
+  "paper_value": "2.53",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "station=70.0",
+   "vai": "test",
+   "chinh_sach": "a3_1_1"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gLatPolarKan",
+  "paper_value": "5.87",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/cs-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "station=70.0",
+   "chinh_sach": "KAN"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gLatPolarMlp",
+  "paper_value": "5.14",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/cs-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "station=70.0",
+   "chinh_sach": "MLP"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gNeo",
+  "paper_value": "0.86",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "neo",
+   "vai": "test",
+   "chinh_sach": "a3_2_1"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gNeoMsinr",
+  "paper_value": "1.90",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "gap_pct",
+  "filter": {
+   "che_do": "neo",
+   "vai": "test",
+   "chinh_sach": "max-sinr"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gNeoSan",
+  "paper_value": "0.12",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "gia_rut_gon",
+  "filter": {
+   "che_do": "neo",
+   "vai": "test",
+   "chinh_sach": "a3_2_1"
+  },
+  "agg": "mean"
+ },
+ {
+  "id": "gNeoVis",
+  "paper_value": "13.0",
+  "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
+  "column": "vis_per_slot",
+  "filter": {
+   "che_do": "neo",
+   "vai": "test",
+   "chinh_sach": "a3_2_1"
+  },
+  "agg": "mean"
+ }
+]

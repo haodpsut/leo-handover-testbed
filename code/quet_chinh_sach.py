@@ -47,12 +47,20 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GOC = os.path.dirname(HERE)
-for p in (os.path.join(GOC, "code"), os.path.join(GOC, "repo-goc", "code")):
-    if os.path.isdir(p) and p not in sys.path:
-        sys.path.insert(0, p)
+# ⛔⛤ CAY LAM VIEC PHAI THANG CAY TRONG KHO. Hai ban cua cung mot tep ton tai: `code/`
+#    (dang sua) va `repo-goc/code/` (hien vat da cong bo). Mot vong `sys.path.insert(0, ...)`
+#    thi cai CHEN SAU dung TRUOC, nen tuy thu tu liet ke ma ban nao che ban nao — va mot ban
+#    CU trong kho da che ban dang sua, bao loi "khong import duoc ham vua them". Dat tuong
+#    minh: kho di truoc trong danh sach, roi cay lam viec duoc nhet len dau SAU CUNG.
+for _p in (os.path.join(GOC, "repo-goc", "code"), os.path.join(GOC, "code")):
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
+if os.path.isdir(os.path.join(GOC, "code")):
+    sys.path.remove(os.path.join(GOC, "code"))
+    sys.path.insert(0, os.path.join(GOC, "code"))
 import handover as H                                   # noqa: E402
 from quet_che_do import NEO, TRUC, ten_che_do          # noqa: E402
-from chay_vps import VI_DO_2D, GIA_HO_2D, xuat_xu      # noqa: E402
+from chay_vps import VI_DO_2D, GIA_HO_2D, xuat_xu, _bo_thuc_the   # noqa: E402
 
 RES = os.path.join(GOC, "results")
 
@@ -64,13 +72,21 @@ def mot_che_do(dv):
     from policy_train import SplineKAN, MLP, Scaler, train_policy, eval_policy, n_params
     NONE = -1
 
-    viec, nhan, kw, seeds_tr, seeds_te = dv
-    p = dict(NEO); p.update(kw)
+    # ⛔ THUC THE NAY LA MOT CAP (hinh hoc, pha dinh), giong het ben `chay_vps`. Hai bo
+    #    quet PHAI dung cung tap thuc the, neu khong phep doi chung K6d khong con phan giao
+    #    nao de so, va cac cot hoc khong con so sanh duoc voi cot A3.
+    viec, nhan, kw, tt_tr, tt_te = dv
+    p0 = dict(NEO); p0.update(kw)
+    lat0 = p0["station"][0]
+
+    def _kb(s, lon):
+        q = dict(p0); q["station"] = (lat0, lon)
+        return H.build_scenario(seed=s, **q)
 
     # --- kịch bản train, và chuyên gia nhị phân từ DP ---
     tr = []
-    for s in seeds_tr:
-        sc = H.build_scenario(seed=s, **p)
+    for s, lon in tt_tr:
+        sc = _kb(s, lon)
         _V, expert, serv_star = HB.solve_dp(sc)
         tr.append((sc, expert, serv_star))
 
@@ -89,25 +105,26 @@ def mot_che_do(dv):
 
     # --- kịch bản test, dựng MỘT LẦN rồi dùng lại ---
     te = []
-    for s in seeds_te:
-        sc = H.build_scenario(seed=s, **p)
+    for s, lon in tt_te:
+        sc = _kb(s, lon)
         J_full, _ = H.dp_optimum(sc)
         _V, expert, serv_bin = HB.solve_dp(sc)
         J_bin = H.evaluate(serv_bin, sc)["J"]
-        te.append((s, sc, expert, J_full, J_bin))
+        te.append((s, lon, sc, expert, J_full, J_bin))
 
     hang = []
     for ten_mh, ctor in (("KAN", lambda: SplineKAN()), ("MLP", lambda: MLP(h=10))):
         for i, (sc_tr, expert_tr, serv_tr) in enumerate(tr):
-            torch.manual_seed(seeds_tr[i])
+            torch.manual_seed(tt_tr[i][0] + int(tt_tr[i][1]))
             mdl = ctor()
             pol = train_policy(mdl, scaler, sc_tr, expert_tr, serv_tr)
             npar = n_params(mdl)
-            for s_te, sc_te, expert_te, J_full, J_bin in te:
+            for s_te, lon_te, sc_te, expert_te, J_full, J_bin in te:
                 r = eval_policy(sc_te, pol, expert_te, J_full)
                 hang.append(dict(
                     viec=viec, che_do=nhan, chinh_sach=ten_mh, khong_gian="binary",
-                    seed_train=seeds_tr[i], seed_test=s_te, so_tham_so=npar,
+                    seed_train=tt_tr[i][0], kinh_do_train=tt_tr[i][1],
+                    seed_test=s_te, kinh_do=lon_te, so_tham_so=npar,
                     gap_pct=round(r["gap"], 6),
                     gap_vs_bin=round(100.0 * (r["J"] - J_bin) / abs(J_full), 6),
                     gia_rut_gon=round(100.0 * (J_bin - J_full) / abs(J_full), 6),
@@ -119,8 +136,9 @@ def mot_che_do(dv):
 
 
 def don_vi(viec, n_train, n_test):
-    tr = list(range(n_train))
-    te = list(range(100, 100 + n_test))
+    _tr, _te = _bo_thuc_the(n_train, n_test)
+    tr = [(s, lon) for _v, s, lon in _tr]
+    te = [(s, lon) for _v, s, lon in _te]
     if viec == "ofat":
         diem, thay = [], set()
         for cd in [("neo", {})] + [(ten_che_do(kw), kw) for t in TRUC for kw in TRUC[t]]:
@@ -149,7 +167,9 @@ def tu_kiem():
             loi.append(ten)
 
     # Mot che do, 2 seed train, 2 seed test: du de kiem hinh dang va cac bat bien.
-    h = mot_che_do(("tu-kiem", "neo", {}, [0, 1], [100, 101]))
+    # Thuc the nay la CAP (hat giong, kinh do): hai hinh hoc khac nhau de phep tu kiem
+    # thuc su di qua duong lay mau moi, chu khong chi qua mot hinh hoc nhu truoc.
+    h = mot_che_do(("tu-kiem", "neo", {}, [(0, 0.0), (1, 180.0)], [(100, 0.0), (101, 180.0)]))
     kiem(len(h) == 2 * 2 * 2, "sinh dung so dong = 2 mo hinh x 2 train x 2 test",
          "%d dong" % len(h))
     kiem({x["chinh_sach"] for x in h} == {"KAN", "MLP"}, "co ca KAN va MLP")

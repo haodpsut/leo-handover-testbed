@@ -184,7 +184,13 @@ def cham(tep=None):
         p = [q for q in nguon if q.endswith(ten)]
         if not p:
             continue
-        v = re.sub(r"\\label\{[^}]*\}|\\ref\{[^}]*\}|\\eqref\{[^}]*\}|%[^\n]*", "", nguon[p[0]])
+        # ⛔⛔ `%[^\n]*` TUNG CAT CA NUA SAU cua moi dong co `\%`, vi dau phan tram DA
+        #    THOAT khong phai chu thich. Hau qua: B6 doc mot ban van bi cat khuc, nen no
+        #    vua BAO DONG GIA (con lai cai `95` tro troi cua "95\% interval") vua CO VUNG
+        #    MU (moi chu so nam sau mot dau `\%` tren cung dong la khong ai soi). Phai co
+        #    `(?<!\\)` moi phan biet duoc chu thich voi dau phan tram.
+        v = re.sub(r"\\label\{[^}]*\}|\\ref\{[^}]*\}|\\eqref\{[^}]*\}|(?<!\\)%[^\n]*",
+                   "", nguon[p[0]])
         v = re.sub(r"\$[^$]*\$", "", v)                      # cong thuc duoc phep co so
         v = re.sub(r"\\(?:cite|citep)[a-z]*\{[^}]*\}", "", v)
         # ⛔ BAO DONG GIA, sinh ra khi chuyen cac khoi float vao trong muc: `scale=1` cua
@@ -194,6 +200,10 @@ def cham(tep=None):
         v = re.sub(r"\\includegraphics(?:\[[^\]]*\])?\{[^}]*\}", "", v)
         v = re.sub(r"\\(?:begin|end)\{\w+\*?\}(?:\[[^\]]*\])?", "", v)
         v = re.sub(r"\\input\{[^}]*\}", "", v)
+        # ⛔ "95\% interval" la MUC TIN CAY, mot tham so quy uoc, khong phai so do. Loai
+        #    dung cum ay chu KHONG them "95" vao danh sach mien: mot khoang cach 95% go tay
+        #    van phai bi bat.
+        v = re.sub(r"\b95\\%\s+interval", "", v)
         so = re.findall(r"(?<![\w\\^{])\d+(?:\.\d+)?(?![\w}])", v)
         so = [s for s in so if s not in ("10", "6", "2")]    # 10^{-6}, so muc, so mu
         kiem(not so, "B6 %s khong go chu so tay" % ten,
@@ -233,13 +243,19 @@ def cham(tep=None):
         sai = []
         for cd, (m, cum, ten) in NEO_CAU.items():
             p = [q for q in nguon if q.endswith(ten)]
-            if not p or cum not in nguon[p[0]]:
+            # ⛔ KHOP THEO KHOANG TRANG MEM. Ban cu so chuoi NGUYEN VAN, nen chi can mot
+            #    lan ngat dong cua LaTeX roi dung giua cum neo la cong bao "khong thay cum
+            #    neo" tren mot cau HOAN TOAN DUNG. Do la bao dong gia, va bao dong gia lam
+            #    nguoi ta nghi cong.
+            _re_cum = re.compile(r"\s+".join(re.escape(w) for w in cum.split()))
+            _mt = _re_cum.search(nguon[p[0]]) if p else None
+            if not _mt:
                 sai.append((m, "khong thay cum neo")); continue
             # Cua so HAI PHIA: macro co the dung truoc cum neo ("sits \gNeo\% from the ...")
             # hoac sau ("The gap grows from \gLatLow\%"). Phep nay bat viec THAY macro trong
             # cau, khong bat duoc thu tu hai macro trong cung mot cau, va chi khai den day.
-            i = nguon[p[0]].index(cum)
-            quanh = nguon[p[0]][max(0, i - 110):i + len(cum) + 110]
+            i, j = _mt.start(), _mt.end()
+            quanh = nguon[p[0]][max(0, i - 110):j + 110]
             # ⛔ KHONG dung `("\\"+m) in quanh`: `\gNeoTeNhat` CHUA chuoi con `\gNeo`, nen
             #    phep khop chuoi cho qua dung ca tiem no phai bat. Phai co BIEN TU.
             if not re.search(r"\\%s(?![A-Za-z])" % re.escape(m), quanh):
@@ -350,6 +366,18 @@ def cham(tep=None):
     else:
         chu_y("B18 bo qua: khong thay measure_figure.py hoac g0-luong.pdf")
 
+    # ---- B21 MAT TIEN BAN THAO: don vi, email lien he, ORCID, tu khoa ----
+    # ⛔ Ban thao di den tan buoc dong goi ma CHI co ten tac gia: khong don vi, khong email
+    #    lien he, khong ORCID. Elsevier doi ca ba va se tra lai o buoc kiem ky thuat truoc
+    #    khi bat ky ai doc noi dung. Moi cong truoc do deu xanh, vi khong cong nao nhin mat
+    #    tien — dung lop loi "viet lai than bai ma mat tien van hua khung cu", lan nay la
+    #    mat tien THIEU chu khong phai mat tien SAI.
+    _mt = [("\\affiliation", "don vi cong tac"), ("\\ead{", "email lien he"),
+           ("orcid.org", "ORCID"), ("\\begin{keyword}", "tu khoa")]
+    _tm = [ly for k, ly in _mt if k not in nguon.get(os.path.join(PAPER, "main.tex"), "")]
+    kiem(not _tm, "B21 mat tien ban thao du muc Elsevier doi",
+         ("thieu: %s" % _tm) if _tm else "%d muc" % len(_mt))
+
     # ---- B19 MOI SO TRONG BANG phai tinh lai duoc tu CSV, bang mot cai dat KHAC ----
     # ⛔⛔ Phan bien ngoai 11/10 bat mot bang TOM TAT in sai vi bo sinh dung khoa che do sai
     #    chinh ta, va hau qua la bang DAO NGUOC thu hang cac truc so voi ket luan cua bai.
@@ -390,9 +418,13 @@ def cham(tep=None):
             if not _dong:
                 _xau.append((_ten, "khong thay hang")); continue
             _so = re.findall(r"(\d+\.\d+)", _dong[0].split("&", 2)[2])
-            _mong = ["%.2f" % min(_v), "%.2f" % max(_v), "%.2f" % (max(_v) - min(_v))]
-            if _so[-3:] != _mong:
-                _xau.append((_ten, "bang in %s, tinh lai ra %s" % (_so[-3:], _mong)))
+            # ⛔ Bang nay co BON cot so, khong ba: min, max, bien do, TI SO. Lay `[-3:]` nhu
+            #    ban cu la truot mot cot va so min voi max — tuc cong doi nhung o SAI.
+            _mong = ["%.2f" % min(_v), "%.2f" % max(_v), "%.2f" % (max(_v) - min(_v)),
+                     # ti so phai tinh tu SO IN RA, cung quy uoc voi B20
+                     "%.1f" % round(float("%.2f" % max(_v)) / float("%.2f" % min(_v)), 1)]
+            if _so[-4:] != _mong:
+                _xau.append((_ten, "bang in %s, tinh lai ra %s" % (_so[-4:], _mong)))
         kiem(not _xau, "B19 moi o cua bang truc che do khop CSV tinh lai",
              ("lech: %s" % _xau) if _xau else "%d truc khop" % len(_truc))
 
@@ -454,18 +486,18 @@ def tu_kiem():
         # ⛔ Ca nay PHAI khong co chu so, neu khong B6 bat truoc va B7 van chua duoc chung minh.
         #    Doi \gNeo thanh mot macro KHAC: so in ra khong con khop CSV, ma khong go so tay nao.
         ("B7: doi so in ra sang macro khac, khong go chu so",
-         lambda: doi(kq, r"\gNeo\% from the unrestricted optimum",
-                     r"\gNeoTeNhat\% from the unrestricted optimum")),
+         lambda: doi(kq, r"$\gNeo\pm\gNeoKtc$\% from the unrestricted optimum",
+                     r"$\gNeoTeNhat\pm\gNeoKtc$\% from the unrestricted optimum")),
         ("B8: tiem mot em-dash",
          lambda: doi(kq, "The instrument:", "The instrument\u2014")),
         ("B5: dung macro KHONG ton tai",
-         lambda: doi(kq, r"\gNeoVis{} satellites", r"\gKhongTonTai{} satellites")),
+         lambda: doi(kq, r"\gNeoVis{} satellites are", r"\gKhongTonTai{} satellites are")),
         ("B6: go mot chu so vao cau ket qua",
          lambda: doi(kq, "The more useful number", "The 42 more useful number")),
         ("B10b: lam mot highlight dai hon 85 ky tu",
-         lambda: doi(hl, r"\item Learned policies beat tuned A3 in only \bdWins{} of \bdCells{} regime cells",
-                     r"\item Learned policies beat the tuned standard A3 mechanism in only "
-                     r"\bdWins{} of \bdCells{} regime cells of the latitude by handover cost slice")),
+         lambda: doi(hl, r"\item Learned policies beat tuned A3 in no regime cell once geometry noise is sized",
+                     r"\item Learned policies beat the tuned standard A3 mechanism in no single "
+                     r"regime cell at all once the geometry sampling noise has been sized properly")),
         ("B9: lam abstract dai hon %d tu" % ABS_MAX,
          lambda: doi(mt, r"\end{abstract}", ("x " * 120) + "\n\\end{abstract}")),
         # ⛔ Phai bo eqref cua phuong trinh chi duoc dan DUNG MOT LAN, va thay bang mot thu
@@ -484,6 +516,8 @@ def tu_kiem():
          None),
         ("B19: tra lai khoa `%g` cho bang truc che do", None),
         ("B20: tinh ti so o do chinh xac day du thay vi tu so in ra", None),
+        ("B21: bo don vi cong tac khoi mat tien",
+         lambda: doi(mt, r"\affiliation[dau]{organization=", r"\xxaffiliation[dau]{organization=")),
         ("B2: tiem mot \\ref treo",
          lambda: doi(kq, r"Table~\ref{tab:dai}", r"Table~\ref{tab:khong-co}")),
     ]

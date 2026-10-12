@@ -1,0 +1,17 @@
+{
+ "mo_ta": "Phep do mot lan: cung seed 0, cung ma, tong tri tuyet doi trong so cua MLP sau khi huan luyen, tren hai may khac phien ban torch. Day la can cu cho luat MOT MAY.",
+ "do_khi": "trong qua trinh dung bo chay, truoc cac luot quet chinh; gia tri tho duoc ghi trong docstring cua code/quet_chinh_sach.py",
+ "phep_do": [
+  {
+   "host": "mac",
+   "torch": "2.8.0",
+   "tong_tri_tuyet_doi_trong_so": 300.888793945
+  },
+  {
+   "host": "sol1",
+   "torch": "2.14.1+cpu",
+   "tong_tri_tuyet_doi_trong_so": 302.828765869
+  }
+ ],
+ "ghi_chu": "DP toi uu thi TRUNG KHIT giua hai may; chi phan huan luyen phan ky."
+}

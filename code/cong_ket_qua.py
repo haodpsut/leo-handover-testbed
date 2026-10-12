@@ -86,7 +86,8 @@ def main():
     for t in [k for k in co if k.startswith("vps-")]:
         theo = collections.defaultdict(dict)
         for x in co[t]:
-            theo[(x["che_do"], x["vai"], x["seed"])][x["chinh_sach"]] = float(x["J"])
+            theo[(x["che_do"], x["vai"], x["seed"],
+                  x.get("kinh_do", ""))][x["chinh_sach"]] = float(x["J"])
         lech = [(k, abs(v["a3_0_1"] - v["max-sinr"]))
                 for k, v in theo.items() if "a3_0_1" in v and "max-sinr" in v]
         xau = [(k, d) for k, d in lech if d > 0]
@@ -130,7 +131,10 @@ def main():
     # ---- K5 du don vi ----
     n_cs = 2 + len([1 for _ in itertools.product(range(5), range(3))])    # 2 heuristic + 15 A3
     for t in [k for k in co if k.startswith("vps-")]:
-        dv = len({(x["che_do"], x["vai"], x["seed"]) for x in co[t]})
+        # ⛔ Them `kinh_do`: sau khi lay mau lai hinh hoc, CUNG mot hat giong xuat hien o
+        #    8 kinh do, nen bo no ra thi cong dem 270 don vi thay vi 2160 va bao thieu.
+        dv = len({(x["che_do"], x["vai"], x["seed"], x.get("kinh_do", ""))
+                  for x in co[t]})
         kiem(len(co[t]) == dv * n_cs, "K5 %s: so dong = so don vi x so chinh sach" % t,
              "%d dong vs %d x %d = %d" % (len(co[t]), dv, n_cs, dv * n_cs))
 
@@ -224,8 +228,12 @@ def main():
 
     # ---- K6d MA DUNG CHUNG cho ra SO TRUNG KHIT, bang chung manh hon mot ma bam ----
     def _bang(ten, cot):
+        # ⛔ Ghep phai theo (che do, hat giong, HINH HOC). Bo hinh hoc ra thi hai bo quet bi
+        #    ghep nham giua cac kinh do khac nhau, va cong bao "19/135 hang lech" tren mot
+        #    du lieu hoan toan dung. Mot phep doi chung ghep sai con te hon khong doi chung.
         r = doc(ten)
-        return {(x["che_do"], x[cot]): (x["J_opt"], x["J_bin"]) for x in r} if r else {}
+        return {(x["che_do"], x[cot], x.get("kinh_do", "")): (x["J_opt"], x["J_bin"])
+                for x in r} if r else {}
     for a_, b_ in (("vps-ofat.csv", "cs-ofat.csv"), ("vps-mat2d.csv", "cs-mat2d.csv")):
         A, B = _bang(a_, "seed"), _bang(b_, "seed_test")
         gi = set(A) & set(B)
