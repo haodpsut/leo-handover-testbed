@@ -89,7 +89,11 @@ def a3_chinh(g, cd):
                 ho=m(tot, "handovers"), pp=m(tot, "pingpong"), out=m(tot, "outage"),
                 khe=m(tot, "S"), msinr=m("max-sinr", "gap_pct"),
                 dai=max(gt) - min(gt), te_nhat=max(gt), n=len(te[tot]),
-                ktc=ktc_cum(te[tot]), hinh=so_hinh(te[tot]))
+                ktc=ktc_cum(te[tot]), hinh=so_hinh(te[tot]),
+                churn=m(tot, "churn"), jopt=m(tot, "J_opt"),
+                tdk=(m(tot, "J") - m(tot, "J_opt")) / m(tot, "S"),
+                aa=(st.mean(float(y["gap_pct"]) for y in te["a3+a2a4"])
+                    if "a3+a2a4" in te else float("nan")))
 
 
 def ktc_cum(hang, cot="gap_pct"):
@@ -178,6 +182,22 @@ def tinh_lai():
     d("gCostHighFloor", A[COST(4.0)]["gia"]); d("gCostHighGreedy", A[COST(4.0)]["msinr"])
     d("gHysDich", ", ".join("%g" % A[COST(c)]["hys"] for c in (0.25, 0.5, 1., 2., 4.)), "%s")
     d("gHysCostLo", A[COST(0.25)]["hys"], "%g"); d("gHysCostHi", A[COST(4.0)]["hys"], "%g")
+    d("gCostTiQuet", round(4.0 / 0.25), "%d")
+    _ts = sorted({A[c]["ttt"] for c in A})
+    d("qTsaoTap", ", ".join("%d" % q for q in _ts), "%s")
+    d("qTsaoMot", "yes" if _ts == [1] else "no", "%s")
+    _n1 = {}
+    for y in of:
+        if (y["che_do"] == "neo" and y["vai"] == "test"
+                and y["chinh_sach"].startswith("a3_") and y["chinh_sach"].endswith("_1")):
+            _n1.setdefault(y["chinh_sach"], []).append(float(y["gap_pct"]))
+    _gg = [st.mean(v) for v in _n1.values()]
+    d("gNeoDaiTmot", max(_gg) - min(_gg), "%.2f")
+    d("gNeoTeNhatTmot", max(_gg), "%.2f")
+    sys.path.insert(0, HERE)
+    from chay_vps import VI_DO_2D as _V2, GIA_HO_2D as _G2
+    d("bdTrucViDo", ", ".join("%g" % v for v in _V2), "%s")
+    d("bdTrucGia", ", ".join("%g" % v for v in _G2), "%s")
 
     # ---------- pha đinh ----------
     d("gFadeZero", A[FADE(0.0)]["gap"], "%.3f"); d("gFadeZeroFloor", A[FADE(0.0)]["gia"], "%.3f")
@@ -213,6 +233,13 @@ def tinh_lai():
                 for c in rieng if A[c]["gap"] > 1e-9)
     d("gSanTiTv", st.median(ti), "%.1f"); d("gSanTiLo", max(0.0, ti[0]), "%.1f")
     d("gSanTiHi", ti[-1], "%.1f"); d("gSanCheDo", len(ti), "%d")
+    _tt = sorted(((100.0 * round(A[c]["gia"], 3) / round(A[c]["gap"], 3)), c)
+                 for c in rieng if A[c]["gap"] > 1e-9)
+    _nh = {"fading_db=0.0": "no fading", "fading_db=6.0": "fading at 6\\,dB",
+           "fading_db=1.0": "fading at 1\\,dB", "fading_db=4.0": "fading at 4\\,dB"}
+    d("gSanTiHiTen", _nh.get(_tt[-1][1], _tt[-1][1].replace("_", "\\_")), "%s")
+    d("gSanTiHiSan", A[_tt[-1][1]]["gia"], "%.3f")
+    d("gSanTiHiGap", A[_tt[-1][1]]["gap"], "%.3f")
     d("gFadeZeroTi", 100.0 * round(A[FADE(0.0)]["gia"], 3) / round(A[FADE(0.0)]["gap"], 3), "%.1f")
     cd = [c for c in rieng if A[c]["gap"] > 1e-9]
     xs = [A[c]["gia"] for c in cd]; ys = [A[c]["vis"] for c in cd]
@@ -240,6 +267,35 @@ def tinh_lai():
     d("gSanTiLatPolar", 100.0 * A[LAT(70.0)]["gia"] / A[LAT(70.0)]["gap"], "%.1f")
     fd = [A[FADE(v)]["gap"] for v in (0., 1., 2.5, 4., 6.)]
     d("gTiPhaDinh", round(float("%.2f" % max(fd)) / float("%.2f" % min(fd)), 1), "%.1f")
+
+    # ---------- THANG TUYET DOI, LUAN CHUYEN, A2/A4 ----------
+    # ⛔ Cai dat RIENG: ti so lay tu gia tri DA LAM TRON (quy uoc §4.2), va thang tuyet doi
+    #    chia cho SO KHE vi S = 1800/delta nen tong khong so duoc doc truc do dai khe.
+    def _r3(a_, b_):
+        return round(float("%.3f" % a_) / float("%.3f" % b_), 1)
+    _vd = [(v, A[LAT(v)]) for v in (0., 15., 30., 45., 60., 70.)]
+    _dinh = max(_vd, key=lambda z: z[1]["tdk"])
+    d("gLatDinhViDo", _dinh[0], "%g")
+    d("gLatDinhTuyetDoi", _dinh[1]["tdk"], "%.3f")
+    d("gLatLowTuyetDoi", A[LAT(15.0)]["tdk"], "%.3f")
+    d("gLatPolarTuyetDoi", A[LAT(70.0)]["tdk"], "%.3f")
+    d("gLatGiamTuDinh",
+      100.0 * (_dinh[1]["tdk"] - A[LAT(70.0)]["tdk"]) / _dinh[1]["tdk"], "%.0f")
+    d("gLatTiTuyetDoi", _r3(A[LAT(70.0)]["tdk"], A[LAT(15.0)]["tdk"]), "%.1f")
+    d("gLatTiMauSo", round(float("%.2f" % abs(A[LAT(15.0)]["jopt"]))
+                           / float("%.2f" % abs(A[LAT(70.0)]["jopt"])), 1), "%.1f")
+    d("gChurnPolar", A[LAT(70.0)]["churn"], "%.3f")
+    d("gChurnThua", A[DEN(6)]["churn"], "%.3f")
+    d("gChurnTi", _r3(A[LAT(70.0)]["churn"], A[DEN(6)]["churn"]), "%.1f")
+    _cm = [A[DEN(k)]["churn"] for k in (6, 9, 12, 15, 18, 24)]
+    d("gChurnMatDoLo", min(_cm), "%.3f"); d("gChurnMatDoHi", max(_cm), "%.3f")
+    d("gChurnViDoNhi", sorted(A[LAT(v)]["churn"] for v in (0., 15., 30., 45., 60., 70.))[-2],
+      "%.3f")
+    d("gAaPolar", A[LAT(70.0)]["aa"], "%.2f")
+    d("gAaPolarGiam", 100.0 * (A[LAT(70.0)]["gap"] - A[LAT(70.0)]["aa"])
+                      / A[LAT(70.0)]["gap"], "%.0f")
+    d("gAaKhacMax", max(abs(A[LAT(v)]["aa"] - A[LAT(v)]["gap"])
+                        for v in (0., 15., 30., 45., 60.)), "%.3f")
 
     # ---------- lát 2D ----------
     vi = sorted({float(dict(kv.split("=") for kv in c.split("+"))["vido"])
@@ -287,6 +343,37 @@ def tinh_lai():
     d("bdThangChac", sum(1 for mm, kk in nh.values() if mm + kk < 0), "%d")
     d("bdNhieuTV", st.median([kk for _, kk in nh.values()]), "%.2f")
     d("bdNhieuMax", max(kk for _, kk in nh.values()), "%.2f")
+    d("bdBienPhatHien", st.median([kk for _, kk in nh.values()]), "%.2f")
+    # Phan vi Bonferroni hai phia tren dung so o da kiem, chia cho 1,96 vi nua be rong
+    # da nhan 1,96 san. Cai dat RIENG, cung cong thuc chuan.
+    _bon = st.NormalDist().inv_cdf(1.0 - 0.025 / len(nh)) / 1.96
+    d("bdChuanThangChac", sum(1 for mm, kk in nh.values() if mm - kk > 0), "%d")
+    d("bdChuanThangBon", sum(1 for mm, kk in nh.values() if mm - kk * _bon > 0), "%d")
+    # Tung kien truc rieng, de do DO LON cua loi the "chon tren tap do".
+    for _a in ("KAN", "MLP"):
+        _n1 = {}
+        for c in chung:
+            _dd = []
+            for gg in sorted({k[1] for k in a3h if k[0] == c}):
+                aa_, bb_ = a3h.get((c, gg)), csh.get((c, _a, gg))
+                if aa_ and bb_:
+                    _dd.append(st.mean(bb_) - st.mean(aa_))
+            if len(_dd) >= 2:
+                _n1[c] = st.mean(_dd)
+        d("bdThang" + _a.title(), sum(1 for mm in _n1.values() if mm < 0), "%d")
+    # TRAN LUOI: hai o "thang" la dung hai o A3 chinh ra h* = dinh luoi hysteresis.
+    _hm = max(float(k.split("_")[1]) for k in A3)
+    d("bdHTran", _hm, "%g")
+    d("bdThangTranLuoi", sum(1 for c in thang if A2[c]["hys"] >= _hm - 1e-9), "%d")
+    if len(thang) == 2:
+        _kk = [dict(kv.split("=") for kv in c.split("+")) for c in thang]
+        _lv2 = sorted(float(x["vido"]) for x in _kk)
+        _gi = _kk[0]["lam3"]
+        _mid = [v for v in vi if _lv2[0] < v < _lv2[1]]
+        _cc = [c for c in ("vido=%g+lam3=%s" % (v, _gi) for v in _mid) if c in hieu]
+        d("bdSoOKeGiua", len(_cc), "%d")
+        if _cc:
+            d("bdOKeGiuaBien", max(hieu[c] for c in _cc), "%.2f")
 
     # ---------- quy mô ----------
     tat = of + m2 + cs_of + cs_m2

@@ -134,6 +134,70 @@ def xuat_xu():
 KHONG_GIAN = {"max-sinr": "full", "max-elev": "full"}        # con lai (a3_*) la "binary"
 
 
+def _luan_chuyen(sc):
+    """Toc do LUAN CHUYEN cua tap nhin thay: hieu doi xung chuan hoa, trung binh theo khe.
+
+    churn[s] = |V[s] \\ V[s-1]| + |V[s-1] \\ V[s]|  chia  |V[s] hop V[s-1]|
+
+    ⛔ Vi sao phep do nay phai TON TAI: bai viet "measuring the churn of the visible set
+       directly does not support that" o §Results va §Conclusion, nhung khong CSV nao co
+       cot luan chuyen — `vis_per_slot` la SO DEM trung binh, khong phai TOC DO DOI. Con
+       so 0,269/khe nam trong bien ban hoi dong G6, tuc ngoai kho. Mot phep do AM cung la
+       mot phep do, va bai nay doi moi so phai tinh lai duoc tu kho.
+    """
+    tong, n = 0.0, 0
+    for s in range(1, sc.S):
+        a, b = set(sc.visible[s - 1].tolist()), set(sc.visible[s].tolist())
+        hop = a | b
+        if hop:
+            tong += len(a ^ b) / len(hop)
+            n += 1
+    return tong / n if n else 0.0
+
+
+def a3_kem_a2a4(sc, hys_db=2.0, ttt=1):
+    """A3 KEM cap A2/A4: phuc vu duoi nguong VA ung vien tot nhat tren nguong thi chuyen ngay.
+
+    ⛔ Day la CAM BIEN, khong phai doi tuong cua bai. §3 khai bon cho `piA` lech khoi
+       TS 38.331 va ket luan "moi lech deu bat loi cho quy tac duoc do". Phan bien chuyen
+       nganh chi ra mot cho lech THU NAM di NGUOC chieu ay: A3 trong thuc te khong bao gio
+       duoc cau hinh mot minh, no di kem A2 (phuc vu xau hon nguong) va A4 (lan can tot hon
+       nguong). Thieu chung, quy tac ngoi mai tren mot ve tinh duoi nguong outage neu khong
+       ung vien nao hon `h` dB. Cot nay de bai KHAI DUOC DO LON cua cho lech ay bang so do
+       cua chinh minh, chu khong doi quy tac duoc do.
+    """
+    nguong = sc.p["sinr_th"]
+    serv = np.full(sc.S, -1, dtype=int)
+    cur, dem, ung = -1, 0, -1
+    for s in range(sc.S):
+        vis = sc.visible[s]
+        if len(vis) == 0:
+            serv[s] = -1; cur, dem, ung = -1, 0, -1
+            continue
+        if cur == -1 or cur not in vis:
+            cur = vis[int(np.argmax(sc.sinr[vis, s]))]
+            dem, ung = 0, -1
+            serv[s] = cur
+            continue
+        khac = vis[vis != cur]
+        if len(khac) == 0:
+            serv[s] = cur; dem, ung = 0, -1
+            continue
+        tot = khac[int(np.argmax(sc.sinr[khac, s]))]
+        # A2 + A4: phuc vu DUOI nguong va ung vien TREN nguong -> chuyen ngay, khong cho TTT
+        if sc.sinr[cur, s] < nguong <= sc.sinr[tot, s]:
+            cur = tot; dem, ung = 0, -1
+        elif sc.sinr[tot, s] > sc.sinr[cur, s] + hys_db:
+            dem = dem + 1 if tot == ung else 1
+            ung = tot
+            if dem >= ttt:
+                cur = tot; dem, ung = 0, -1
+        else:
+            dem, ung = 0, -1
+        serv[s] = cur
+    return serv
+
+
 def _mot_diem_a3(kw, seed, lon=0.0):
     """DP đầy đủ + DP nhị phân + heuristic + toàn lưới A3, cho MỘT chế độ và MỘT thực thể.
 
@@ -145,17 +209,42 @@ def _mot_diem_a3(kw, seed, lon=0.0):
     lat = p["station"][0]
     p["station"] = (lat, lon)
     sc = H.build_scenario(seed=seed, **p)
-    J_opt, _ = H.dp_optimum(sc)
+    # ⛔ LAY CA LICH cua DP day du. Ban truoc viet `J_opt, _ = H.dp_optimum(sc)`, tuc BO
+    #    lich di, nen phep kiem "moi lich tra ve duoc danh gia lai doc lap" ma Bang 6 khai
+    #    la mot chuoi HANG GO TAY: no khong chay tren dong san xuat nao. Nay danh gia lai
+    #    that, va `lech_dp` di vao CSV de bang in SO DO duoc chu khong in niem tin.
+    J_opt, serv_opt = H.dp_optimum(sc)
+    lech_dp = abs(H.evaluate(serv_opt, sc)["J"] - J_opt)
+    assert lech_dp < 1e-6, "DP day du: gia tri ham khac gia tri danh gia lai %.3e" % lech_dp
     _V, _ex, serv_bin = HB.solve_dp(sc)
     J_bin = H.evaluate(serv_bin, sc)["J"]
     assert J_bin >= J_opt - 1e-9, "DP nhi phan tot hon DP day du: %.9f < %.9f" % (J_bin, J_opt)
-    r = {"J_opt": J_opt, "J_bin": J_bin,
-         "vis": sum(len(v) for v in sc.visible) / sc.S, "N": sc.N, "S": sc.S}
+    r = {"J_opt": J_opt, "J_bin": J_bin, "lech_dp": lech_dp,
+         "vis": sum(len(v) for v in sc.visible) / sc.S, "N": sc.N, "S": sc.S,
+         # ⛔ LUAN CHUYEN cua TAP NHIN THAY. Bai tung viet "measuring the churn of the
+         #    visible set directly does not support that" trong khi KHONG CSV nao co cot
+         #    luan chuyen: so 0,269/khe nam trong bien ban hoi dong, khong nam trong kho.
+         #    Mot phep do AM cung phai la hien vat. Day la ti le hieu doi xung chuan hoa.
+         "churn": _luan_chuyen(sc)}
     r["max-sinr"] = H.evaluate(H.greedy_max_sinr(sc), sc)
     r["max-elev"] = H.evaluate(H.greedy_max_elev(sc), sc)
+    # ⛔ A2/A4 la CAM BIEN, khong phai doi tuong cua bai. Quy tac duoc do van la A3 thuan;
+    #    cot nay chi de bai KHAI DUOC DO LON cua dieu kien lech thu nam thay vi noi suong
+    #    rang moi lech deu bat loi cho quy tac duoc do.
+    r["a3+a2a4"] = H.evaluate(a3_kem_a2a4(sc, hys_db=2.0, ttt=1), sc)
     for h, t in itertools.product(HYS, TTT):
         r["a3_%g_%d" % (h, t)] = H.evaluate(a3_ttt(sc, hys_db=h, ttt=t), sc)
     return r
+
+
+def DANH_SACH_CHINH_SACH():
+    """MOT nguon cho danh sach chinh sach ma bo chay ghi ra moi thuc the.
+
+    ⛔ `cong_ket_qua.py` phep K5 doc ham nay thay vi dem cung `2 + 15`. Them mot chinh sach
+       o day va cong tu biet; khai o hai cho thi som muon chung lech.
+    """
+    return (["max-sinr", "max-elev", "a3+a2a4"]
+            + ["a3_%g_%d" % (h, t) for h, t in itertools.product(HYS, TTT)])
 
 
 def viec_a3(dv):
@@ -163,8 +252,7 @@ def viec_a3(dv):
     ten, nhan, kw, seed, vai, lon = dv
     r = _mot_diem_a3(kw, seed, lon)
     hang = []
-    for k in ["max-sinr", "max-elev"] + ["a3_%g_%d" % (h, t)
-                                         for h, t in itertools.product(HYS, TTT)]:
+    for k in DANH_SACH_CHINH_SACH():
         e = r[k]
         hang.append(dict(viec=ten, che_do=nhan, vai=vai, seed=seed, kinh_do=lon,
                          chinh_sach=k,
@@ -181,6 +269,9 @@ def viec_a3(dv):
                          J_bin=round(r["J_bin"], 6),
                          pingpong=e["pingpong"], handovers=e["handovers"],
                          outage=e["outage"], vis_per_slot=round(r["vis"], 4),
+                         # Hai cot MOI: toc do luan chuyen tap nhin thay, va lech cua phep
+                         # danh gia lai lich DP. Ca hai de bai in SO DO thay vi niem tin.
+                         churn=round(r["churn"], 6), lech_dp="%.3e" % r["lech_dp"],
                          N=r["N"], S=r["S"]))
     return hang
 
@@ -208,13 +299,30 @@ def viec_a3(dv):
 G_HINH = 8
 
 
+# ⛔⛔ KINH DO PHAI KHONG CHIA HET cho khoang cach mat phang Walker (360/P).
+#    Ban truoc dung buoc deu 360/8 = 45 do. Nhung khoang cach RAAN la 360/P, nen 8 buoc
+#    45 do ALIAS: so pha RIENG that su la
+#        P= 6 -> 4,  P= 9 -> 8,  P=12 -> **2**,  P=15 -> 8,  P=18 -> 4,  P=24 -> **1**
+#    Tuc o chom 24x24, tam "hinh hoc" la MOT hinh hoc tam lan, va KTC cum tinh tren ban
+#    sao nen no HEP lai dung o cho phep lay mau suy bien. Truc mat do lai la DOI CHUNG cho
+#    muc san, nen khong the bo qua.
+#    Buoc ti le vang 360*k*phi (phi = 0,6180339887...) la day do lech thap tieu chuan va
+#    khong giao hoan voi bat ky 360/P nao: tu-kiem 3 duoi day canh dieu do, va no DOI chu
+#    khong chi canh bao.
+PHI = 0.6180339887498949
+
+
+def _kinh_do(g):
+    return (360.0 * g * PHI) % 360.0
+
+
 def _bo_thuc_the(n_train, n_test):
     """Tra ve [(vai, seed, kinh_do)], G hinh hoc x (n/G) hat giong pha dinh moi vai."""
     f_tr = max(1, n_train // G_HINH)
     f_te = max(1, n_test // G_HINH)
-    tr = [("train", s, 360.0 * g / G_HINH)
+    tr = [("train", s, round(_kinh_do(g), 3))
           for g in range(G_HINH) for s in range(f_tr)]
-    te = [("test", s, 360.0 * g / G_HINH)
+    te = [("test", s, round(_kinh_do(g), 3))
           for g in range(G_HINH) for s in range(100, 100 + f_te)]
     return tr, te
 
@@ -298,6 +406,31 @@ def main():
         print("  %s tu-kiem 3: khai duoc host va phien ban goi  [%s, numpy %s]"
               % ("DAT " if ok3 else "HONG", x["host"], x["goi"].get("numpy")))
         loi += [] if ok3 else ["xuat-xu"]
+
+        # ⛔ tu-kiem 4: KHONG ALIAS voi luoi Walker. Day la phep kiem ma ban truoc KHONG CO,
+        #    va vi khong co no nen bo quet chay 8 "hinh hoc" trong khi o chom 24x24 that su
+        #    chi co 1 pha rieng. Phep nay doc chinh danh sach P ma `quet_che_do` quet, nen
+        #    them mot chom moi vao bo quet ma no alias thi cong DO ngay tai day.
+        from quet_che_do import TRUC as _TRUC
+        _P = sorted({kw["n_planes"] for tr in _TRUC for kw in _TRUC[tr] if "n_planes" in kw}
+                    | {NEO["n_planes"]})
+        _lons = [_kinh_do(g) for g in range(G_HINH)]
+        _xau = []
+        for _p in _P:
+            _sp = 360.0 / _p
+            _r = sorted((l % _sp) / _sp for l in _lons)
+            _n = 1
+            for _i in range(1, len(_r)):
+                if _r[_i] - _r[_i - 1] > 1e-3:
+                    _n += 1
+            if _n < G_HINH:
+                _xau.append((_p, _n))
+        ok4 = not _xau
+        print("  %s tu-kiem 4: %d kinh do cho %d pha RIENG voi moi P  [%s]"
+              % ("DAT " if ok4 else "HONG", G_HINH, G_HINH,
+                 ("ALIAS: " + str(_xau)) if _xau else "P = " + str(_P)))
+        loi += [] if ok4 else ["alias-walker"]
+
         print("\n=> %s (%d loi)" % ("DAT" if not loi else "CHUA DAT", len(loi)))
         return 1 if loi else 0
 

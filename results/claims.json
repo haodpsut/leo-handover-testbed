@@ -1,7 +1,7 @@
 [
  {
   "id": "gCostHigh",
-  "paper_value": "2.33",
+  "paper_value": "2.25",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -13,7 +13,7 @@
  },
  {
   "id": "gCostLow",
-  "paper_value": "0.71",
+  "paper_value": "0.69",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -25,7 +25,7 @@
  },
  {
   "id": "gFadeHigh",
-  "paper_value": "0.52",
+  "paper_value": "0.53",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -37,7 +37,7 @@
  },
  {
   "id": "gFadeMid",
-  "paper_value": "0.86",
+  "paper_value": "0.81",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -49,7 +49,7 @@
  },
  {
   "id": "gLatLow",
-  "paper_value": "0.46",
+  "paper_value": "0.53",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -61,7 +61,7 @@
  },
  {
   "id": "gLatPolar",
-  "paper_value": "2.53",
+  "paper_value": "2.80",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -73,7 +73,7 @@
  },
  {
   "id": "gLatPolarKan",
-  "paper_value": "5.87",
+  "paper_value": "6.16",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/cs-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -84,7 +84,7 @@
  },
  {
   "id": "gLatPolarMlp",
-  "paper_value": "5.14",
+  "paper_value": "5.48",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/cs-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -95,7 +95,7 @@
  },
  {
   "id": "gNeo",
-  "paper_value": "0.86",
+  "paper_value": "0.81",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -107,7 +107,7 @@
  },
  {
   "id": "gNeoMsinr",
-  "paper_value": "1.90",
+  "paper_value": "1.97",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
   "column": "gap_pct",
   "filter": {
@@ -119,7 +119,7 @@
  },
  {
   "id": "gNeoSan",
-  "paper_value": "0.12",
+  "paper_value": "0.09",
   "csv": "/Users/agentra/Documents/hao/working/paper-lab/hao-paper-2026/2026-10-10-leo-handover-regime/results/vps-ofat.csv",
   "column": "gia_rut_gon",
   "filter": {

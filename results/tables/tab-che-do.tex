@@ -1,12 +1,15 @@
 %% SINH TU DONG boi code/sinh_hinh_bang.py. KHONG sua tay.
-\begin{tabular}{lp{0.30\linewidth}rrrr}
+\footnotesize
+\begin{tabular}{@{}lp{0.19\linewidth}rrrrrr@{}}
 \toprule
-Axis & Values swept & min & max & span & ratio \\
+& & \multicolumn{3}{c}{relative to $\lvert\Jstar\rvert$ (\%)} & \multicolumn{3}{c}{absolute, per slot} \\
+\cmidrule(lr){3-5}\cmidrule(l){6-8}
+Axis & Values swept & min & max & ratio & min & max & ratio \\
 \midrule
-latitude $\phi$ (deg) & 0, 15, 30, 45, 60, 70 & 0.46 & 2.53 & \textbf{2.07} & \textbf{5.5} \\
-handover cost $\lam_3$ & 0.25, 0.5, 1, 2, 4 & 0.71 & 2.33 & \textbf{1.62} & \textbf{3.3} \\
-fading $\sigma$ (dB) & 0, 1, 2.5, 4, 6 & 0.05 & 0.86 & \textbf{0.81} & \textbf{17.2} \\
-slot $\Delta$ (s) & 5, 15, 30, 60 & 0.54 & 0.86 & \textbf{0.32} & \textbf{1.6} \\
-planes $=$ sats/plane & 6, 9, 12, 15, 18, 24 & 0.42 & 0.86 & \textbf{0.44} & \textbf{2.0} \\
+latitude $\phi$ (deg) & 0, 15, 30, 45, 60, 70 & 0.51 & 2.80 & \textbf{5.5} & 0.089 & 0.171 & \textbf{1.9} \\
+handover cost $\lam_3$ & 0.25, 0.5, 1, 2, 4 & 0.69 & 2.25 & \textbf{3.3} & 0.141 & 0.438 & \textbf{3.1} \\
+fading $\sigma$ (dB) & 0, 1, 2.5, 4, 6 & 0.05 & 0.81 & \textbf{16.2} & 0.010 & 0.162 & \textbf{16.2} \\
+slot $\Delta$ (s) & 5, 15, 30, 60 & 0.46 & 0.84 & \textbf{1.8} & 0.092 & 0.168 & \textbf{1.8} \\
+planes $=$ sats/plane & 6, 9, 12, 15, 18, 24 & 0.47 & 0.81 & \textbf{1.7} & 0.049 & 0.162 & \textbf{3.3} \\
 \bottomrule
 \end{tabular}

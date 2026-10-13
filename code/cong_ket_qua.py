@@ -129,7 +129,13 @@ def main():
                  % (tot.replace("a3_", "hys="), tb[tot], tb.get("a3_0_1", float("nan"))))
 
     # ---- K5 du don vi ----
-    n_cs = 2 + len([1 for _ in itertools.product(range(5), range(3))])    # 2 heuristic + 15 A3
+    # ⛔⛔ LAY TU BO CHAY, khong dem cung. Ban cu viet `2 + 15` tay, nen khi bo chay them
+    #    mot chinh sach cam bien (`a3+a2a4`) thi cong bao THIEU DU LIEU tren mot tep DU.
+    #    Do la bao dong gia, va bao dong gia tren mot cong dem dong la cach nhanh nhat de
+    #    nguoi ta tap bo qua no. Nay danh sach chinh sach la MOT nguon: bo chay khai, cong doc.
+    sys.path.insert(0, HERE)
+    from chay_vps import DANH_SACH_CHINH_SACH
+    n_cs = len(DANH_SACH_CHINH_SACH())
     for t in [k for k in co if k.startswith("vps-")]:
         # ⛔ Them `kinh_do`: sau khi lay mau lai hinh hoc, CUNG mot hat giong xuat hien o
         #    8 kinh do, nen bo no ra thi cong dem 270 don vi thay vi 2160 va bao thieu.

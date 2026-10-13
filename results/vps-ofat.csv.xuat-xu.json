@@ -11,17 +11,28 @@
   "matplotlib": "3.11.2"
  },
  "commit_kho_goc": null,
- "ma_bam_code": "0b5bceb27e123c3e",
- "so_tep_ma": 7,
+ "ma_bam_code": "29bfa23f39fe162b",
+ "so_tep_ma": 18,
  "tep_ma": [
+  "code/ablation.py",
+  "code/camera_ready_extra.py",
   "code/chay_vps.py",
+  "code/cong_bai.py",
+  "code/cong_ket_qua.py",
+  "code/cong_so_lieu.py",
+  "code/cong_thu_ngo.py",
+  "code/cong_van_lieu.py",
+  "code/handover.py",
+  "code/handover_binary.py",
+  "code/make_figures_v2.py",
+  "code/policy_train.py",
   "code/quet_che_do.py",
   "code/quet_chinh_sach.py",
-  "repo-goc/code/camera_ready_extra.py",
-  "repo-goc/code/handover.py",
-  "repo-goc/code/handover_binary.py",
-  "repo-goc/code/policy_train.py"
+  "code/robustness.py",
+  "code/run_final.py",
+  "code/sinh_hinh_bang.py",
+  "code/smoke_g1.py"
  ],
- "utc": "2026-10-12T04:54:59.980465+00:00",
+ "utc": "2026-10-12T14:05:36.583954+00:00",
  "nhan_cpu": 80
 }

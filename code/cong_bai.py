@@ -203,7 +203,7 @@ def cham(tep=None):
         # ⛔ "95\% interval" la MUC TIN CAY, mot tham so quy uoc, khong phai so do. Loai
         #    dung cum ay chu KHONG them "95" vao danh sach mien: mot khoang cach 95% go tay
         #    van phai bi bat.
-        v = re.sub(r"\b95\\%\s+interval", "", v)
+        v = re.sub(r"\b95\\%\s+(interval|level)", "", v)
         so = re.findall(r"(?<![\w\\^{])\d+(?:\.\d+)?(?![\w}])", v)
         so = [s for s in so if s not in ("10", "6", "2")]    # 10^{-6}, so muc, so mu
         kiem(not so, "B6 %s khong go chu so tay" % ten,
@@ -219,9 +219,9 @@ def cham(tep=None):
     NEO_CAU = {                 # (macro bat buoc, cum neo trong NGUON, tep)
         "neo": ("gNeo", r"\% from the unrestricted optimum", "04-results.tex"),
         "station=70.0": ("gLatPolar", r"at $\phi=70^\circ$, a factor of", "04-results.tex"),
-        "station=15.0": ("gLatLow", r"The gap grows from", "04-results.tex"),
-        "lam3=4.0": ("gCostHigh", r"the gap grows from", "04-results.tex"),
-        "fading_db=0.0": ("gFadeZero", r"The gap is", "04-results.tex"),
+        "station=15.0": ("gLatLow", r"\% at $\phi=15^\circ$", "04-results.tex"),
+        "lam3=4.0": ("gCostHigh", r"As $\lam_3$ rises", "04-results.tex"),
+        "fading_db=0.0": ("gFadeZero", r"with no fading, peaks at", "04-results.tex"),
     }
     if goc:
         # B7a macro phai khop CSV tinh lai bang CAI DAT DOC LAP
@@ -255,7 +255,10 @@ def cham(tep=None):
             # hoac sau ("The gap grows from \gLatLow\%"). Phep nay bat viec THAY macro trong
             # cau, khong bat duoc thu tu hai macro trong cung mot cau, va chi khai den day.
             i, j = _mt.start(), _mt.end()
-            quanh = nguon[p[0]][max(0, i - 110):j + 110]
+            # ⛔ Cua so 110 ky tu TUNG lam cong do tren mot cau DUNG: macro roi ra ngoai
+            #    cua so mot vai ky tu khi cau duoc viet lai dai hon. Noi rong ra 180, va day
+            #    van la mot cua so chu khong phai ca tep, nen phep "thay macro" van bi bat.
+            quanh = nguon[p[0]][max(0, i - 180):j + 180]
             # ⛔ KHONG dung `("\\"+m) in quanh`: `\gNeoTeNhat` CHUA chuoi con `\gNeo`, nen
             #    phep khop chuoi cho qua dung ca tiem no phai bat. Phai co BIEN TU.
             if not re.search(r"\\%s(?![A-Za-z])" % re.escape(m), quanh):
@@ -392,10 +395,18 @@ def cham(tep=None):
         for x in _csv.DictReader(io.open(_p, encoding="utf-8")):
             _g.setdefault((x["che_do"], x["vai"]), {}).setdefault(x["chinh_sach"], []).append(x)
 
-        def _gap(cd):
-            tr, te = _g[(cd, "train")], _g[(cd, "test")]
+        def _tot(cd):
+            tr = _g[(cd, "train")]
             tb = {k: st.mean(float(y["gap_pct"]) for y in tr[k]) for k in A3 if k in tr}
-            return st.mean(float(y["gap_pct"]) for y in te[min(tb, key=tb.get)])
+            return min(tb, key=tb.get)
+
+        def _gap(cd):
+            return st.mean(float(y["gap_pct"]) for y in _g[(cd, "test")][_tot(cd)])
+
+        def _abs(cd):
+            te = _g[(cd, "test")][_tot(cd)]
+            return (st.mean(float(y["J"]) for y in te)
+                    - st.mean(float(y["J_opt"]) for y in te)) / st.mean(float(y["S"]) for y in te)
 
         _truc = {
             "latitude": ["station=%.1f" % v for v in (0., 15., 30., 45., 60., 70.)],
@@ -420,13 +431,77 @@ def cham(tep=None):
             _so = re.findall(r"(\d+\.\d+)", _dong[0].split("&", 2)[2])
             # ⛔ Bang nay co BON cot so, khong ba: min, max, bien do, TI SO. Lay `[-3:]` nhu
             #    ban cu la truot mot cot va so min voi max — tuc cong doi nhung o SAI.
-            _mong = ["%.2f" % min(_v), "%.2f" % max(_v), "%.2f" % (max(_v) - min(_v)),
-                     # ti so phai tinh tu SO IN RA, cung quy uoc voi B20
-                     "%.1f" % round(float("%.2f" % max(_v)) / float("%.2f" % min(_v)), 1)]
-            if _so[-4:] != _mong:
-                _xau.append((_ten, "bang in %s, tinh lai ra %s" % (_so[-4:], _mong)))
+            # ⛔ SAU cot so, khong bon: min, max, bien do, ti so, abs/khe min, abs/khe max.
+            #    Phep nay da truot cot HAI LAN khi bang doi hinh (3 -> 4 -> 6), nen nay no
+            #    tinh lai CA cot tuyet doi chu khong chi dem ba so cuoi.
+            _w = [_abs(c) for c in _cds if (c, "test") in _g]
+            _mong = ["%.2f" % min(_v), "%.2f" % max(_v),
+                     # moi ti so tinh tu SO IN RA, cung quy uoc voi B20
+                     "%.1f" % round(float("%.2f" % max(_v)) / float("%.2f" % min(_v)), 1),
+                     "%.3f" % min(_w), "%.3f" % max(_w),
+                     "%.1f" % round(float("%.3f" % max(_w)) / float("%.3f" % min(_w)), 1)]
+            if _so[-6:] != _mong:
+                _xau.append((_ten, "bang in %s, tinh lai ra %s" % (_so[-6:], _mong)))
         kiem(not _xau, "B19 moi o cua bang truc che do khop CSV tinh lai",
              ("lech: %s" % _xau) if _xau else "%d truc khop" % len(_truc))
+
+    # ---- B23 KHONG VIET SO DO BANG CHU ----
+    # ⛔⛔ Ca ba phan bien bat cung mot cho: chu thich Hinh 5 ghi "A nineteenfold change" trong
+    #    khi moi cho khac dung `\gMatDoTiVis` = 16,1. No LOT qua phep B6 vi B6 tim CHU SO,
+    #    con "nineteenfold" la mot TU. Vung mu nay co thuc: moi "-fold" trong bai la mot phep
+    #    do, nen mot "-fold" khong di kem macro la mot so go tay. Phep nay canh dung dieu ay,
+    #    o moi muc ket qua va thao luan.
+    _TUSO = (r"one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|"
+             r"fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|"
+             r"fifty|sixty|seventy|eighty|ninety|hundred")
+    _chu = []
+    # ⛔ MOI muc, khong chi ba muc. Ca tiem dau cua toi cho phep nay LOT vi no neo vao
+    #    `03-formulation.tex`, va danh sach cu khong co tep ay. Mot phep kiem chi soi mot
+    #    phan bai la mot phep kiem co vung mu, va vung mu ay se duoc dung den.
+    for ten in sorted(z for z in nguon if "/sections/" in z or z.endswith("main.tex")):
+        _v = re.sub(r"(?<!\\)%[^\n]*", "", nguon[ten])
+        for _m in re.finditer(r"\b(%s)[- ]?fold\b" % _TUSO, _v, re.I):
+            _chu.append((os.path.basename(ten), _m.group(0)))
+        # ⛔ PHAN SO viet bang chu cung vay, va no DA LOT mot lan: §5.4 viet "two fifths"
+        #    canh mot macro, roi sau khi lay mau lai cuc tren chuyen che do VA con so thanh
+        #    39,2%, nen ca ten che do lan phan so sai mot luc.
+        _PS = (r"half|halves|third|thirds|quarter|quarters|fifth|fifths|sixth|sixths|tenth|tenths")
+        for _m in re.finditer(r"\b(%s)\s+(%s)\b" % (_TUSO, _PS), _v, re.I):
+            _chu.append((os.path.basename(ten), _m.group(0)))
+    kiem(not _chu, "B23 khong viet SO DO bang chu (x-fold, phan so)",
+         ("go bang chu: %s" % _chu) if _chu else "0 cho")
+
+    # ---- B22 BANG BAT BIEN: o DO DUOC phai thoa o DOI HOI ----
+    # ⛔⛔ Phan bien 3 bat duoc dieu khong cong nao hoi: bang bat bien in "535 rows, 112"
+    #    canh nguong "$0$", tuc **bang tu khai nhac cu HONG**, trong khi van xuoi o ba cho
+    #    khac noi 4280 hang va khop tuyet doi. Nguyen nhan: toi sua khoa doi chung o cong va
+    #    o macro roi quen bang. Khong cong nao bat vi khong cong nao DOC chinh noi dung o.
+    #    Nay doc: neu o "Required" la 0 (hoac <= nguong) thi o "Measured" phai thoa.
+    _bd = os.path.join(RES, "tables", "tab-dung-cu.tex")
+    if os.path.exists(_bd):
+        _xau2 = []
+        for _l in doc(_bd).splitlines():
+            if "&" not in _l or _l.lstrip().startswith("%") or "\\toprule" in _l:
+                continue
+            _o = [q.strip() for q in _l.replace("\\\\", "").split("&")]
+            if len(_o) != 4 or _o[0].startswith("Invariant"):
+                continue
+            _do, _doi = _o[2], _o[3]
+            # lay so DAU TIEN cua moi o, bo dau phan cach nghin va ky hieu toan
+            def _so1(s):
+                m_ = re.search(r"-?\d+(?:[.,\\ ]\d+)*(?:e[-+]?\d+)?", s.replace("\\,", ""))
+                return float(m_.group(0).replace(",", "")) if m_ else None
+            if _doi.replace("$", "").strip() in ("0", "$0$"):
+                # o do duoc co the la "4\,280 rows, 0": so PHAI thoa la so CUOI
+                _c = re.findall(r"-?\d+(?:\.\d+)?(?:e[-+]?\d+)?", _do.replace("\\,", ""))
+                if _c and float(_c[-1]) != 0.0:
+                    _xau2.append((_o[0][:44], _do, _doi))
+            elif "le" in _doi or "\\le" in _doi:
+                _a, _b = _so1(_do), _so1(_doi)
+                if _a is not None and _b is not None and _a > _b * 1.000001:
+                    _xau2.append((_o[0][:44], _do, _doi))
+        kiem(not _xau2, "B22 bang bat bien: o do duoc thoa o doi hoi",
+             ("VI PHAM: %s" % _xau2) if _xau2 else "moi hang thoa")
 
     # ---- B20 TI SO IN RA phai bang ti so CUA CAC SO IN RA ----
     # ⛔ Bai in 2,91 va 0,32 roi in ti so 9,2; nguoi doc chia tay ra 9,1. Mot so khong kiem
@@ -464,7 +539,26 @@ def cham(tep=None):
     return loi
 
 
+KHOA = os.path.join(HERE, ".tu-kiem.khoa")
+
+
 def tu_kiem():
+    # ⛔⛔ BO TIEM SUA BO SINH roi dung lai, va no dung lai tu BAN NO LUU LUC BAT DAU. Chay
+    #    no o nen trong khi toi dang sua `sinh_hinh_bang.py` da XOA mot ban va cua toi va
+    #    lam ba macro bien mat khoi bai. Khong co dau hieu nao ngoai mot cong do kho hieu.
+    #    Day la lop loi "tai nguyen dung chung trong viec song song" cua so nha. Nay co khoa,
+    #    va no bao TEN tien trinh dang giu de nguoi doc biet phai cho cai gi.
+    if os.path.exists(KHOA):
+        sys.exit("⛔ bo tiem DANG CHAY o mot tien trinh khac (%s). Khong chay hai ban mot luc: "
+                 "ca hai cung sua va cung dung lai `sinh_hinh_bang.py`." % io.open(KHOA).read().strip())
+    io.open(KHOA, "w", encoding="utf-8").write("pid %d, %s\n" % (os.getpid(), __file__))
+    try:
+        return _tu_kiem()
+    finally:
+        os.path.exists(KHOA) and os.remove(KHOA)
+
+
+def _tu_kiem():
     # ⛔ Danh sach nay PHAI trung danh sach trong `cham()`. Lan dau no thieu fig-luong.tex va
     #    alg-dp.tex nen ban GOC cua phep tiem tu HONG (B13c, B14), tuc khung tiem bao dong gia
     #    tren chinh no. Nay lay chung mot nguon de khong the lech nua.
@@ -520,6 +614,12 @@ def tu_kiem():
          lambda: doi(mt, r"\affiliation[dau]{organization=", r"\xxaffiliation[dau]{organization=")),
         ("B2: tiem mot \\ref treo",
          lambda: doi(kq, r"Table~\ref{tab:dai}", r"Table~\ref{tab:khong-co}")),
+        # ⛔ HAI CA MOI, cho hai cong sinh ra tu ba bao cao phan bien 13/10. Mot cong chua
+        #    tung bi tiem la mot dau chua thu.
+        ("B22: bo `kinh_do` khoi khoa doi chung hai luot trong bo sinh", None),
+        ("B23: viet mot so do bang CHU", 
+         lambda: doi(f3, r"the gap in some regimes and \gSanTiHi\% of it in others.",
+                     "the gap in some regimes and two fifths of it in others.")),
     ]
     print("== Ban GOC ==")
     if cham(goc):
@@ -528,6 +628,19 @@ def tu_kiem():
     bs = os.path.join(HERE, "sinh_hinh_bang.py")
     ma_goc = doc(bs)
     tiem_ma = {
+        # ⛔ Phai bo `kinh_do` khoi CA HAI khoa. Ban dau toi chi bo o khoa A, nen hai khoa
+        #    khac hinh dang, giao hai tap thanh RONG, bang in "0 rows, 0" va cong CHO QUA.
+        #    Mot ca tiem sua nua van de tao ra mot trang thai sai KHAC chu khong tai hien
+        #    loi that.
+        "B22: bo `kinh_do` khoi khoa doi chung hai luot trong bo sinh":
+            ('        A = {(x["che_do"], x["seed"], x.get("kinh_do", "")): (x["J_opt"], x["J_bin"])\n'
+             '             for x in (tai(a_) or [])}\n'
+             '        B = {(x["che_do"], x["seed_test"], x.get("kinh_do", "")): (x["J_opt"], x["J_bin"])\n'
+             '             for x in (tai(b_) or [])}',
+             '        A = {(x["che_do"], x["seed"]): (x["J_opt"], x["J_bin"])\n'
+             '             for x in (tai(a_) or [])}\n'
+             '        B = {(x["che_do"], x["seed_test"]): (x["J_opt"], x["J_bin"])\n'
+             '             for x in (tai(b_) or [])}'),
         # ⛔ BA CA DUOI DAY tai hien DUNG ba loi phan bien ngoai tim ra ngay 11/10, va chung
         #    tiem vao BO SINH vi do la noi ba loi that da nam.
         "B19: tra lai khoa `%g` cho bang truc che do":

@@ -115,6 +115,11 @@ BANG = ["tab-ky-hieu.tex", "tab-che-do.tex", "tab-doi-chieu.tex", "tab-chinh.tex
 HINH_TIKZ = ["g0-luong.pdf"]
 
 
+def _ti3_tron(tu, mau):
+    """Ti so tinh tu gia tri lam tron 3 chu so thap phan, dung quy uoc cong B20."""
+    return round(float("%.3f" % tu) / float("%.3f" % mau), 1)
+
+
 def _ti2(tu, mau):
     """Ti so tinh tu gia tri DA LAM TRON nhu bai in, 2 chu so thap phan.
 
@@ -213,7 +218,7 @@ def _ktc_cum(hang, cot="gap_pct"):
     return 1.96 * st.stdev(cm) / math.sqrt(len(cm))
 
 
-def _nhieu_bien_gioi(m2_a3, o_can):
+def _nhieu_bien_gioi(m2_a3, o_can, chi=None):
     """Voi tung o cua lat 2D, bien do chenh HOC - A3 CHINH co phan biet voi 0 khong.
 
     ⛔ Cau hoi nay KHONG tra loi duoc bang trung binh. Hoi dong G6 chi ra: `bdWins`
@@ -233,6 +238,8 @@ def _nhieu_bien_gioi(m2_a3, o_can):
     ra = {}
     for c in o_can:
         ten = {k[1] for k in csg if k[0] == c}
+        if chi is not None:
+            ten = {q for q in ten if q == chi}
         if not ten:
             continue
         # ⛔ Chon chinh sach MOT lan theo trung binh toan o, khong chon theo tung hinh
@@ -275,7 +282,23 @@ def a3_theo_che_do(hang):
                       #    hoc 5 hat giong pha dinh. Coi 40 thuc the la doc lap se danh
                       #    gia THAP sai so, vi 5 thuc the cung hinh hoc tuong quan manh.
                       ktc=_ktc_cum(te[tot]),
-                      vis=m(tot, "vis_per_slot"), n=len(te[tot]))
+                      vis=m(tot, "vis_per_slot"), n=len(te[tot]),
+                      # ⛔ THANG TUYET DOI. Khoang cach chia cho |J*|, va |J*| co 3,5 lan tu
+                      #    15 do len 70 do, nen ti so 5,5x gom 1,6x TU SO va 3,5x MAU SO. Tren
+                      #    thang cua chinh ham muc tieu, khoang cach DAT DINH o 45 do roi GIAM.
+                      #    Khong co hai cot nay thi ket qua manh nhat cua bai la mot hieu ung
+                      #    chuan hoa, va bai dang KHAI rang Bang 3 bao ca hai thang trong khi
+                      #    ca hai cot cua no deu la ham cua cung mot gap da chuan hoa.
+                      jopt=m(tot, "J_opt"), tuyet_doi=m(tot, "J") - m(tot, "J_opt"),
+                      # ⛔ CHIA CHO SO KHE. Tong tuyet doi KHONG so duoc doc truc do dai khe,
+                      #    vi S = 1800/delta nen chan troi 5 s co 360 khe con 60 s co 30 khe,
+                      #    va chi phi tong ti le voi S. Bo cot nay di thi cot "tuyet doi" se
+                      #    noi do dai khe la truc manh nhat, trong khi do chi la so khe.
+                      tuyet_doi_khe=(m(tot, "J") - m(tot, "J_opt")) / m(tot, "S"),
+                      # LUAN CHUYEN tap nhin thay, va A3 kem cap A2/A4 lam cam bien.
+                      churn=m(tot, "churn"),
+                      aa=(st.mean(float(y["gap_pct"]) for y in te["a3+a2a4"])
+                          if "a3+a2a4" in te else float("nan")))
     return ra
 
 
@@ -636,10 +659,17 @@ def b_chinh(a3, cs, ten_tep):
               ("n_planes=24+sats_per_plane=24", "dense $24{\\times}24$")]
     with io.open(os.path.join(TAB, ten_tep), "w", encoding="utf-8") as f:
         f.write(SINH)
-        f.write("\\begin{tabular}{lrrrrrr}\n\\toprule\n")
-        f.write("Regime & \\multicolumn{2}{c}{tuned A3} & floor & KAN & MLP & max-SINR \\\\\n")
+        # ⛔ `max-elev` TUNG duoc danh gia va KHONG xuat hien o bang hay hinh nao. Phan bien
+        #    chuyen nganh chi ra rang no la thu gan nhat trong bai voi mot trigger kieu D1/T1
+        #    (ephemeris, khong do kenh) cua Rel-17, nen bo no ra la bo dung cai moc ma nguoi
+        #    doc nganh nay muon thay. Cot `A3+A2/A4` cung o day: xem §3.4.
+        f.write("\\footnotesize\n\\setlength{\\tabcolsep}{3.6pt}\n"
+                "\\begin{tabular}{@{}lrrrrrrrr@{}}\n\\toprule\n")
+        f.write("Regime & \\multicolumn{2}{c}{tuned A3} & floor & $+$A2/A4"
+                " & KAN & MLP & {\\scriptsize max-SINR} & {\\scriptsize max-elev}"
+                " \\\\\n")
         f.write("\\cmidrule(lr){2-3}\n")
-        f.write(" & $(h,T)$ & gap & & gap & gap & gap \\\\\n\\midrule\n")
+        f.write(" & $(h,T)$ & gap & & gap & gap & gap & gap & gap \\\\\n\\midrule\n")
         for cd, ten in thu_tu:
             if cd not in a3:
                 continue
@@ -648,10 +678,11 @@ def b_chinh(a3, cs, ten_tep):
             # ⛔ Phan bien ngoai vong 2: bang nay in 0,11 va 0,06 o HAI chu so, trong khi
             #    §5.4 dan 0,109 va 0,058 de doc gia chia ra 53,2%. Hai cho noi ve CUNG mot
             #    che do o hai do chinh xac thi phep chia khong kiem lai duoc. Nay BA chu so.
-            f.write("%s & (%g, %d) & %.3f & %.3f & %s & %s & %.2f \\\\\n"
-                    % (ten, v["hys"], v["ttt"], v["gap"], v["gia"],
+            f.write("%s & (%g, %d) & %.3f & %.3f & %.2f & %s & %s & %.2f & %.2f \\\\\n"
+                    % (ten, v["hys"], v["ttt"], v["gap"], v["gia"], v["aa"],
                        ("%.2f" % k["KAN"]) if "KAN" in k else "n/a",
-                       ("%.2f" % k["MLP"]) if "MLP" in k else "n/a", v["msinr"]))
+                       ("%.2f" % k["MLP"]) if "MLP" in k else "n/a",
+                       v["msinr"], v["melev"]))
         f.write("\\bottomrule\n\\end{tabular}\n")
     print("  -> %s" % os.path.join("results/tables", ten_tep))
 
@@ -732,16 +763,26 @@ def b_che_do(a3, ten_tep):
         # ⛔ KHO TRANG DO DUOC la 360pt. Them cot thu sau lam bang tran 23,9pt, va cach sua
         #    dung KHONG phai thu nho chu: cot "Values swept" la cot dai nhat va no chiu duoc
         #    ngat dong, nen cho no mot `p{}` co dinh thay vi `l` tu gian.
-        f.write("\\begin{tabular}{lp{0.30\\linewidth}rrrr}\n\\toprule\n")
-        f.write("Axis & Values swept & min & max & span & ratio \\\\\n\\midrule\n")
+        # ⛔ KHO DO DUOC = 360pt. Tam cot o `\\normalsize` tran 116pt. `\\footnotesize`,
+        #    cot gia tri quet co dinh va `@{}` hai dau cho be rong la hang so, va mot hang
+        #    tieu de hai tang de khong phai viet "abs/slot min" dai dong trong mot o.
+        f.write("\\footnotesize\n\\begin{tabular}{@{}lp{0.19\\linewidth}rrrrrr@{}}\n\\toprule\n")
+        f.write("& & \\multicolumn{3}{c}{relative to $\\lvert\\Jstar\\rvert$ (\\%)}"
+                " & \\multicolumn{3}{c}{absolute, per slot} \\\\\n")
+        f.write("\\cmidrule(lr){3-5}\\cmidrule(l){6-8}\n")
+        f.write("Axis & Values swept & min & max & ratio & min & max & ratio"
+                " \\\\\n\\midrule\n")
         for ten, gt, cds in truc:
             thieu = [c for c in cds if c not in a3]
             # ⛔ KHONG `if c in a3` roi di tiep: bo qua am tham la cach loi tren song sot.
             assert not thieu, ("⛔ bang truc che do: khoa KHONG giai duoc tren truc %r: %s"
                                % (ten, thieu))
             v = [a3[c]["gap"] for c in cds]
-            f.write("%s & %s & %.2f & %.2f & \\textbf{%.2f} & \\textbf{%.1f} \\\\\n"
-                    % (ten, gt, min(v), max(v), max(v) - min(v), _ti2(max(v), min(v))))
+            w = [a3[c]["tuyet_doi_khe"] for c in cds]
+            f.write("%s & %s & %.2f & %.2f & \\textbf{%.1f} & %.3f & %.3f"
+                    " & \\textbf{%.1f} \\\\\n"
+                    % (ten, gt, min(v), max(v), _ti2(max(v), min(v)),
+                       min(w), max(w), _ti3_tron(max(w), min(w))))
         f.write("\\bottomrule\n\\end{tabular}\n")
     print("  -> %s" % os.path.join("results/tables", ten_tep))
 
@@ -766,7 +807,11 @@ def b_doi_chieu(ten_tep):
         ("\\citet{kodheli2024}", [N, P, N, N]),
         ("\\citet{juan2022}", [N, N, N, N]),
         ("\\citet{benzaghta2025}", [N, Y, N, N]),
-        ("\\citet{zhao2026twc}", [Q, N, N, N]),
+        # ⛔ CA BON o phai la `?`. Caption noi dau hoi nghia la "khong lay duoc toan van", va
+        #    neu khong lay duoc toan van thi bai CUNG khong the khang dinh su VANG MAT cua ba
+        #    thu kia. Mot dong tron ky hieu `?` voi `x` la mot dong tu nhan minh biet thu minh
+        #    vua noi la khong biet.
+        ("\\citet{zhao2026twc}", [Q, Q, Q, Q]),
         ("\\citet{chou2026ddqn}", [N, N, N, N]),
         ("\\citet{lee2023dho}", [N, N, N, N]),
         ("\\citet{hozayen2022}", [N, N, N, N]),
@@ -795,11 +840,27 @@ def doi_chung_hai_luot():
     TỆP nên nó đổi khi một lượt quét thêm bộ chạy của riêng nó, còn cái đáng hỏi là mã dùng
     chung có cho ra cùng một số không.
     """
+    # ⛔⛔ KHOA PHAI CO `kinh_do`. Toi da sua dieu nay o cong K6d va o macro `qGiaoHang`,
+    #    roi QUEN chinh BANG nay. Hau qua khong phai lech nhe: thieu hinh hoc thi 8 ban ghi
+    #    cung mot hat giong gop lam MOT, chi ban ghi cuoi song sot, nen so hang giao nhau tut
+    #    4280 -> 535 VA 112 phep so la so hai ban ghi cua HAI HINH HOC KHAC NHAU. Bang in
+    #    "535 rows, 112" canh nguong "0", tuc **bang bat bien tu khai nhac cu HONG**, trong
+    #    khi van xuoi o ba cho khac noi 4280 va khop tuyet doi. Day la lop loi "mot ban va
+    #    nhieu cho doc": sua nguon so lieu ma khong sua moi noi tieu thu no.
     n = l = 0
     for a_, b_ in (("vps-ofat.csv", "cs-ofat.csv"), ("vps-mat2d.csv", "cs-mat2d.csv")):
-        A = {(x["che_do"], x["seed"]): (x["J_opt"], x["J_bin"]) for x in (tai(a_) or [])}
-        B = {(x["che_do"], x["seed_test"]): (x["J_opt"], x["J_bin"]) for x in (tai(b_) or [])}
+        A = {(x["che_do"], x["seed"], x.get("kinh_do", "")): (x["J_opt"], x["J_bin"])
+             for x in (tai(a_) or [])}
+        B = {(x["che_do"], x["seed_test"], x.get("kinh_do", "")): (x["J_opt"], x["J_bin"])
+             for x in (tai(b_) or [])}
         gi = set(A) & set(B)
+        # ⛔⛔ KIEM 0 DON VI KHONG PHAI LA SACH. Ca tiem cho phep B22 lam lo ra dieu nay:
+        #    bo `kinh_do` khoi MOT trong hai khoa thi khoa ben nay la 2-tuple, ben kia
+        #    3-tuple, giao hai tap thanh RONG, va bang in "0 rows, 0" — tuc "0 lech" tren
+        #    0 phep so. Cong B22 doc so cuoi la 0 nen CHO QUA. Mot phep doi chung chay tren
+        #    khong hang nao phai HONG, khong duoc bao dat.
+        assert gi, ("⛔ doi chung hai luot: KHONG co hang nao giao nhau giua %s va %s. "
+                    "Rat co the hai khoa khong cung hinh dang." % (a_, b_))
         n += len(gi); l += sum(1 for k in gi if A[k] != B[k])
     return n, l
 
@@ -936,10 +997,73 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep, so_hinh_ve):
     #    IN RA se ra 9,1. Ti so tinh o do chinh xac day du KHONG kiem lai duoc tu trang giay.
     #    Nay moi ti so tinh TU CHINH HAI SO BAI IN, nen doc gia lam lai luon ra dung.
     _ti = _ti2
+    # Thang TUYET DOI doc truc vi do: dinh o dau, va giam bao nhieu tu dinh den 70 do.
+    _vd = [(v, a3[K(station=(v, 0.0))]) for v in (0., 15., 30., 45., 60., 70.)]
+    _dinh = max(_vd, key=lambda z: z[1]["tuyet_doi_khe"])
+    dat("gLatDinhViDo", _dinh[0], "%g")
+    dat("gLatDinhTuyetDoi", _dinh[1]["tuyet_doi_khe"], "%.3f")
+    dat("gLatPolarTuyetDoi", a3[K(station=(70.0, 0.0))]["tuyet_doi_khe"], "%.3f")
+    dat("gLatLowTuyetDoi", a3[K(station=(15.0, 0.0))]["tuyet_doi_khe"], "%.3f")
+    dat("gLatGiamTuDinh",
+        100.0 * (_dinh[1]["tuyet_doi_khe"] - a3[K(station=(70.0, 0.0))]["tuyet_doi_khe"])
+        / _dinh[1]["tuyet_doi_khe"], "%.0f")
+    # ⛔ `_ti2` lam tron 2 chu so, nhung dai luong nay IN 3 chu so: 0,15/0,10 cho 1,5 trong
+    #    khi 0,149/0,095 cho 1,6. Phep kiem doc lap bat duoc ngay. Do chinh xac cua ham lam
+    #    tron phai khop do chinh xac bai IN, khong phai mot hang so chon san.
+    dat("gLatTiTuyetDoi", _ti3_tron(a3[K(station=(70.0, 0.0))]["tuyet_doi_khe"],
+                                    a3[K(station=(15.0, 0.0))]["tuyet_doi_khe"]), "%.1f")
+    dat("gLatTiMauSo", _ti2(abs(a3[K(station=(15.0, 0.0))]["jopt"]),
+                            abs(a3[K(station=(70.0, 0.0))]["jopt"])), "%.1f")
+    # --- LUAN CHUYEN: phep do ma ban truoc KHAI la da lam ma khong co trong hien vat ---
+    # ⛔ Lan truoc toi RUT co che "mong cong luan chuyen" dua tren mot phep do cua hoi dong
+    #    G6 chay tren hinh hoc DA BI ALIAS va mot dinh nghia luan chuyen khac. Nay phep do
+    #    nam trong CSV, tren hinh hoc khong alias, va no NOI NGUOC lai: 70 do luan chuyen
+    #    nhanh nhat. Nen cai phai rut la LAN RUT ay, khong phai co che.
+    _c70, _c66 = a3[K(station=(70.0, 0.0))], a3[K(n_planes=6, sats_per_plane=6)]
+    dat("gChurnPolar", _c70["churn"], "%.3f")
+    dat("gChurnThua", _c66["churn"], "%.3f")
+    dat("gChurnTi", _ti3_tron(_c70["churn"], _c66["churn"]), "%.1f")
+    _cm = [a3[K(n_planes=k, sats_per_plane=k)]["churn"] for k in (6, 9, 12, 15, 18, 24)]
+    dat("gChurnMatDoLo", min(_cm), "%.3f")
+    dat("gChurnMatDoHi", max(_cm), "%.3f")
+    _cv = [a3[K(station=(v, 0.0))]["churn"] for v in (0., 15., 30., 45., 60., 70.)]
+    dat("gChurnViDoNhi", sorted(_cv)[-2], "%.3f")   # lon thu hai doc truc vi do
+    # --- A3 kem A2/A4: do lon cua cho lech thu nam so voi TS 38.331 ---
+    dat("gAaPolar", _c70["aa"], "%.2f")
+    dat("gAaPolarGiam", 100.0 * (_c70["gap"] - _c70["aa"]) / _c70["gap"], "%.0f")
+    _aa_khac = max(abs(a3[K(station=(v, 0.0))]["aa"] - a3[K(station=(v, 0.0))]["gap"])
+                   for v in (0., 15., 30., 45., 60.))
+    dat("gAaKhacMax", _aa_khac, "%.3f")
     dat("gLatPolarRatio", _ti(a3[K(station=(70.0, 0.0))]["gap"],
                               a3[K(station=(15.0, 0.0))]["gap"]), "%.1f")
     # Ti so dau-cuoi cua truc pha dinh: thang TI SO xep no dung dau, va bai phai in ca hai
     # thu hang chu khong chi cai thuan cho minh.
+    # Ti so hai dau cua truc GIA, tinh tu chinh cac gia tri quet. La tham so, khong phai so
+    # do, nhung cong B23 doi moi "x-fold" phai co macro, va dung vay: "sixteenfold" go tay
+    # la mot con so khong ai kiem lai duoc tu trang giay.
+    dat("gCostTiQuet", round(4.0 / 0.25), "%d")
+    # ⛔⛔ `T* = 1 o MOI che do` la mot TUYEN BO, nen no phai la phep do. Bai tung viet
+    #    "Why the time-to-trigger exists" o chu thich Hinh 12 va "all of the anti-ping-pong
+    #    work is done by T" o §3.4, trong khi bo chinh KHONG BAO GIO chon T > 1. Hai cau ay
+    #    bi chinh bang 8 cua bai bac, va khong cong nao hoi.
+    _tsao = sorted({a3[c]["ttt"] for c in a3})
+    dat("qTsaoTap", ", ".join("%d" % q for q in _tsao), "%s")
+    dat("qTsaoMot", "yes" if _tsao == [1] else "no", "%s")
+    # Bien do cua khoang cach TRONG hang T = 1 o che do neo, so voi bien do ca luoi.
+    _neo_tr = [y for y in of_hang if y["che_do"] == "neo" and y["vai"] == "test"]
+    _tb1 = {}
+    for y in _neo_tr:
+        if y["chinh_sach"].startswith("a3_") and y["chinh_sach"].endswith("_1"):
+            _tb1.setdefault(y["chinh_sach"], []).append(float(y["gap_pct"]))
+    _g1 = [st.mean(v) for v in _tb1.values()]
+    dat("gNeoDaiTmot", max(_g1) - min(_g1), "%.2f")
+    dat("gNeoTeNhatTmot", max(_g1), "%.2f")
+    # ⛔ TRUC CUA LAT 2D chua bao gio duoc in ra, va no chay tu 0,25 den 6 trong khi truc 1D
+    #    dung o 4. Nen mot nguoi doc gap "lam3 = 6" o §5.5 se tuong la loi danh may. Hai macro
+    #    nay lay thang tu bo quet.
+    from chay_vps import VI_DO_2D as _V2, GIA_HO_2D as _G2
+    dat("bdTrucViDo", ", ".join("%g" % v for v in _V2), "%s")
+    dat("bdTrucGia", ", ".join("%g" % v for v in _G2), "%s")
     dat("gTiPhaDinh", _ti(max(a3[K(fading_db=v)]["gap"] for v in (0., 1., 2.5, 4., 6.)),
                           min(a3[K(fading_db=v)]["gap"] for v in (0., 1., 2.5, 4., 6.))), "%.1f")
     # ⛔⛔ HAI GIẢI THÍCH LIÊN TIẾP CHO TRỤC NÀY, CẢ HAI ĐỀU BỊ SỐ LIỆU BÁC.
@@ -1019,7 +1143,17 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep, so_hinh_ve):
     #    cau §4.2 toi viet de tran an phan bien vong truoc la SAI duoi uoc luong dung.
     dat("gSanTiTv", st.median(ti), "%.1f")
     dat("gSanTiLo", max(0.0, ti[0]), "%.1f")      # ⛔ kep ve 0: tỉ lệ âm là vô nghĩa, và nó
-    dat("gSanTiHi", ti[-1], "%.1f")               #    chỉ sinh ra từ làm tròn -0.000000
+    dat("gSanTiHi", ti[-1], "%.1f")
+    # ⛔ TEN che do co ti le san CAO NHAT phai la macro. Ban truoc §5.4 go TAY ca ten che do
+    #    ("With no fading") VA phan so ("two fifths"). Sau khi lay mau lai, cuc tren chuyen
+    #    sang pha dinh 6 dB va con so thanh 39,2%, nen ca hai sai mot luc.
+    _tt = sorted(((100.0 * round(a3[c]["gia"], 3) / round(a3[c]["gap"], 3)), c)
+                 for c in rieng if a3[c]["gap"] > 1e-9)
+    _nhan = {"fading_db=0.0": "no fading", "fading_db=6.0": "fading at 6\\,dB",
+             "fading_db=1.0": "fading at 1\\,dB", "fading_db=4.0": "fading at 4\\,dB"}
+    dat("gSanTiHiTen", _nhan.get(_tt[-1][1], _tt[-1][1].replace("_", "\\_")), "%s")
+    dat("gSanTiHiSan", a3[_tt[-1][1]]["gia"], "%.3f")
+    dat("gSanTiHiGap", a3[_tt[-1][1]]["gap"], "%.3f")               #    chỉ sinh ra từ làm tròn -0.000000
     dat("gSanCheDo", len(ti), "%d")
     dat("qCheDoRieng", len(rieng), "%d")
     # ⛔⛔ CÂU TÔI ĐÃ VIẾT BỊ CHÍNH PHÉP ĐO NÀY BÁC. Tôi viết trong §Results rằng "sàn nhỏ ở
@@ -1110,6 +1244,44 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep, so_hinh_ve):
         dat("bdNhieuTV", st.median([k_ for _, k_ in nh.values()]), "%.2f")
         dat("bdNhieuMax", max(k_ for _, k_ in nh.values()), "%.2f")
         dat("bdOdoNhieu", len(nh), "%d")
+        # ⛔ "0 o" KHONG co nghia la "khong co hieu ung": no co nghia la KHONG O NAO GIAI
+        #    DUOC. Phai in BIEN DO NHO NHAT PHAT HIEN DUOC, khong thi doc gia doc mot ket
+        #    luan am manh hon du lieu cho phep.
+        dat("bdBienPhatHien", st.median([k_ for _, k_ in nh.values()]), "%.2f")
+        # So o A3 thang CHAC CHAN, co va khong co hieu chinh da so sanh Bonferroni tren 80 o.
+        a3c = [c for c, (m_, k_) in nh.items() if m_ - k_ > 0]
+        # ⛔⛔ CA HAI cai dat cua toi deu SAI va sai KHAC NHAU: mot cai cho z hieu dung
+        #    5,50, mot cai cho 2,81, dung phai la phan vi Bonferroni hai phia cho so o that
+        #    su kiem. Nay tinh tu phan vi chuan, khong go hang so.
+        _zb = st.NormalDist().inv_cdf(1.0 - 0.05 / (2.0 * len(nh)))
+        _bon = _zb / 1.96
+        a3b = [c for c, (m_, k_) in nh.items() if m_ - k_ * _bon > 0]
+        dat("bdChuanThangChac", len(a3c), "%d")
+        dat("bdChuanThangBon", len(a3b), "%d")
+        # ⛔ KIEN TRUC chon tren tap do: in DO LON cua loi the ay, khong chi khai la co.
+        for _ten in ("KAN", "MLP"):
+            _nh1 = _nhieu_bien_gioi(m2_a3, chung, chi=_ten)
+            dat("bdThang" + _ten.title(),
+                sum(1 for m_, _ in _nh1.values() if m_ < 0), "%d")
+        # ⛔ TRAN LUOI: hai o "thang" la dung hai o A3 chinh ra h* = dinh luoi. Ben hoc khong
+        #    thang trong mot che do dinh vi duoc, no thang o noi DOI THU HET LUOI.
+        _hmax = max(HYS)
+        _tt = [c for c, d in hieu.items() if d < 0]
+        dat("bdThangTranLuoi", sum(1 for c in _tt if m2_a3[c]["hys"] >= _hmax - 1e-9), "%d")
+        dat("bdHTran", _hmax, "%g")
+        # O KE GIUA hai o thang (neu co): bang chung "dai" that ra la cac o ROI NHAU.
+        if len(_tt) == 2:
+            _k = [dict(kv.split("=") for kv in c.split("+")) for c in _tt]
+            _vd = sorted(float(x["vido"]) for x in _k)
+            _gi = _k[0]["lam3"]
+            _giua = [v for v in sorted({float(dict(kv.split("=") for kv in c.split("+"))["vido"])
+                                        for c in chung})
+                     if _vd[0] < v < _vd[1]]
+            _c2 = ["vido=%g+lam3=%s" % (v, _gi) for v in _giua]
+            _c2 = [c for c in _c2 if c in hieu]
+            dat("bdSoOKeGiua", len(_c2), "%d")
+            if _c2:
+                dat("bdOKeGiuaBien", max(hieu[c] for c in _c2), "%.2f")
         vd = sorted({float(dict(kv.split("=") for kv in c.split("+"))["vido"]) for c in thang})
         dat("bdLatLo", vd[0], "%g"); dat("bdLatHi", vd[-1], "%g")
         gh = sorted({float(dict(kv.split("=") for kv in c.split("+"))["lam3"]) for c in thang})
