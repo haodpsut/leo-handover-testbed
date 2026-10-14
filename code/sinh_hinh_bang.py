@@ -1031,9 +1031,27 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep, so_hinh_ve):
     # --- A3 kem A2/A4: do lon cua cho lech thu nam so voi TS 38.331 ---
     dat("gAaPolar", _c70["aa"], "%.2f")
     dat("gAaPolarGiam", 100.0 * (_c70["gap"] - _c70["aa"]) / _c70["gap"], "%.0f")
-    _aa_khac = max(abs(a3[K(station=(v, 0.0))]["aa"] - a3[K(station=(v, 0.0))]["gap"])
-                   for v in (0., 15., 30., 45., 60.))
-    dat("gAaKhacMax", _aa_khac, "%.3f")
+    # ⛔⛔ BAN CU TINH CHI TREN TRUC VI DO roi §3.4 viet "on every other regime point we
+    #    swept ... at most 0.000 points". Doc ngoai vong 3 bat ngay: Bang 4 in chenh tu
+    #    +1,63 den -1,20. A2/A4 KHONG phai mot cai tien deu, no DANH DOI: giup o 70 do va o
+    #    chom thua, nhung lam XAU o pha dinh 0 (0,051 -> 1,676) va o gia chuyen giao cao, vi
+    #    nhung cho ay lien ket phuc vu it khi duoi nguong nen cac lan chon lai them chi ton
+    #    them chuyen giao. Day la lop loi "cuc tri tinh tren MOT PHAN doi thu" cua so nha.
+    _ch = {c: a3[c]["aa"] - a3[c]["gap"] for c in a3}
+    _xau = max(_ch.values())           # lam xau nhieu nhat
+    _tot = min(_ch.values())           # giup nhieu nhat
+    _tenx = max(_ch, key=_ch.get)
+    dat("gAaXauMax", _xau, "%.2f")
+    dat("gAaTotMax", -_tot, "%.2f")
+    dat("gAaSoXau", sum(1 for v in _ch.values() if v > 1e-6), "%d")
+    dat("gAaSoTot", sum(1 for v in _ch.values() if v < -1e-6), "%d")
+    dat("gAaSoBang", sum(1 for v in _ch.values() if abs(v) <= 1e-6), "%d")
+    _nhanx = {"fading_db=0.0": "no fading", "lam3=4.0": "the dearest handover"}
+    dat("gAaXauTen", _nhanx.get(_tenx, _tenx.replace("_", "\\_")), "%s")
+    dat("gAaXauGap", a3[_tenx]["gap"], "%.3f")
+    dat("gAaXauAa", a3[_tenx]["aa"], "%.3f")
+    dat("gAaXauTi", round(float("%.3f" % a3[_tenx]["aa"])
+                          / float("%.3f" % a3[_tenx]["gap"])), "%d")
     dat("gLatPolarRatio", _ti(a3[K(station=(70.0, 0.0))]["gap"],
                               a3[K(station=(15.0, 0.0))]["gap"]), "%.1f")
     # Ti so dau-cuoi cua truc pha dinh: thang TI SO xep no dung dau, va bai phai in ca hai

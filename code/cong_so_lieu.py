@@ -294,8 +294,17 @@ def tinh_lai():
     d("gAaPolar", A[LAT(70.0)]["aa"], "%.2f")
     d("gAaPolarGiam", 100.0 * (A[LAT(70.0)]["gap"] - A[LAT(70.0)]["aa"])
                       / A[LAT(70.0)]["gap"], "%.0f")
-    d("gAaKhacMax", max(abs(A[LAT(v)]["aa"] - A[LAT(v)]["gap"])
-                        for v in (0., 15., 30., 45., 60.)), "%.3f")
+    _ch = {c: A[c]["aa"] - A[c]["gap"] for c in A}
+    _tx = max(_ch, key=_ch.get)
+    d("gAaXauMax", max(_ch.values()), "%.2f")
+    d("gAaTotMax", -min(_ch.values()), "%.2f")
+    d("gAaSoXau", sum(1 for v in _ch.values() if v > 1e-6), "%d")
+    d("gAaSoTot", sum(1 for v in _ch.values() if v < -1e-6), "%d")
+    d("gAaSoBang", sum(1 for v in _ch.values() if abs(v) <= 1e-6), "%d")
+    _nx = {"fading_db=0.0": "no fading", "lam3=4.0": "the dearest handover"}
+    d("gAaXauTen", _nx.get(_tx, _tx.replace("_", "\\_")), "%s")
+    d("gAaXauGap", A[_tx]["gap"], "%.3f"); d("gAaXauAa", A[_tx]["aa"], "%.3f")
+    d("gAaXauTi", round(float("%.3f" % A[_tx]["aa"]) / float("%.3f" % A[_tx]["gap"])), "%d")
 
     # ---------- lát 2D ----------
     vi = sorted({float(dict(kv.split("=") for kv in c.split("+"))["vido"])
