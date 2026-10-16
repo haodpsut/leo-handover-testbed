@@ -678,7 +678,10 @@ def b_chinh(a3, cs, ten_tep):
             # ⛔ Phan bien ngoai vong 2: bang nay in 0,11 va 0,06 o HAI chu so, trong khi
             #    §5.4 dan 0,109 va 0,058 de doc gia chia ra 53,2%. Hai cho noi ve CUNG mot
             #    che do o hai do chinh xac thi phep chia khong kiem lai duoc. Nay BA chu so.
-            f.write("%s & (%g, %d) & %.3f & %.3f & %.2f & %s & %s & %.2f & %.2f \\\\\n"
+            # ⛔ Cot `+A2/A4` phai BA chu so nhu cot gap. O hai chu so, bon hang "khong doi"
+            #    khong phan biet duoc voi mot thay doi nho hon 0,005, va §3.4 dan 1,676 trong
+            #    khi bang in 1,68 cho CUNG mot o.
+            f.write("%s & (%g, %d) & %.3f & %.3f & %.3f & %s & %s & %.2f & %.2f \\\\\n"
                     % (ten, v["hys"], v["ttt"], v["gap"], v["gia"], v["aa"],
                        ("%.2f" % k["KAN"]) if "KAN" in k else "n/a",
                        ("%.2f" % k["MLP"]) if "MLP" in k else "n/a",
@@ -1009,9 +1012,12 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep, so_hinh_ve):
     dat("gLatDinhTuyetDoi", _dinh[1]["tuyet_doi_khe"], "%.3f")
     dat("gLatPolarTuyetDoi", a3[K(station=(70.0, 0.0))]["tuyet_doi_khe"], "%.3f")
     dat("gLatLowTuyetDoi", a3[K(station=(15.0, 0.0))]["tuyet_doi_khe"], "%.3f")
-    dat("gLatGiamTuDinh",
-        100.0 * (_dinh[1]["tuyet_doi_khe"] - a3[K(station=(70.0, 0.0))]["tuyet_doi_khe"])
-        / _dinh[1]["tuyet_doi_khe"], "%.0f")
+    # ⛔ TINH TU SO IN RA. Ban cu tinh o do chinh xac day du va ra 12, trong khi doc gia lay
+    #    hai so bai IN (0,171 va 0,149) thi duoc 13. §4.2 cam ket nguoc lai, nen day la bai
+    #    tu pha cam ket cua minh. Doc ngoai vong 4 bat dung cho nay.
+    _d_in = float("%.3f" % _dinh[1]["tuyet_doi_khe"])
+    _p_in = float("%.3f" % a3[K(station=(70.0, 0.0))]["tuyet_doi_khe"])
+    dat("gLatGiamTuDinh", 100.0 * (_d_in - _p_in) / _d_in, "%.0f")
     # ⛔ `_ti2` lam tron 2 chu so, nhung dai luong nay IN 3 chu so: 0,15/0,10 cho 1,5 trong
     #    khi 0,149/0,095 cho 1,6. Phep kiem doc lap bat duoc ngay. Do chinh xac cua ham lam
     #    tron phai khop do chinh xac bai IN, khong phai mot hang so chon san.
@@ -1087,8 +1093,13 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep, so_hinh_ve):
     from chay_vps import VI_DO_2D as _V2, GIA_HO_2D as _G2
     dat("bdTrucViDo", ", ".join("%g" % v for v in _V2), "%s")
     dat("bdTrucGia", ", ".join("%g" % v for v in _G2), "%s")
-    dat("gTiPhaDinh", _ti(max(a3[K(fading_db=v)]["gap"] for v in (0., 1., 2.5, 4., 6.)),
-                          min(a3[K(fading_db=v)]["gap"] for v in (0., 1., 2.5, 4., 6.))), "%.1f")
+    # ⛔⛔ BA CHO pha cam ket §4.2, va doc ngoai chi bat duoc HAI. Cho thu ba la day: `_ti`
+    #    lam tron CA HAI toan hang ve 2 chu so (0,81/0,05 = 16,2), nhung bai IN tu so o 2 chu
+    #    so va mau so o BA (`\gFadeZero` = 0,051), nen doc gia chia tay ra 15,9. Khi hai toan
+    #    hang in o hai do chinh xac khac nhau thi khong duoc dung MOT ham lam tron cho ca hai;
+    #    phai lam tron TUNG CAI theo dung do chinh xac no duoc in.
+    _fv = [a3[K(fading_db=v)]["gap"] for v in (0., 1., 2.5, 4., 6.)]
+    dat("gTiPhaDinh", round(float("%.2f" % max(_fv)) / float("%.3f" % min(_fv)), 1), "%.1f")
     # ⛔⛔ HAI GIẢI THÍCH LIÊN TIẾP CHO TRỤC NÀY, CẢ HAI ĐỀU BỊ SỐ LIỆU BÁC.
     #    (1) "vì 70° THIẾU ỨNG VIÊN": chế độ mật độ 6 còn thiếu hơn mà khoảng cách chỉ 0,42%.
     #    (2) "thiếu ứng viên CỘNG luân chuyển nhanh": hội đồng G6 đo luân chuyển của TẬP NHÌN
@@ -1194,16 +1205,31 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep, so_hinh_ve):
     dat("gSanTuongQuanVis", _pear([a3[c]["gia"] for c in _cd], [a3[c]["vis"] for c in _cd]), "%.2f")
     dat("gSanLonNhatMong", a3[K(station=(70.0, 0.0))]["gia"], "%.3f")
     dat("gSanNhoNhatDay", a3[K(station=(15.0, 0.0))]["gia"], "%.3f")
-    dat("gVisMong", a3[K(station=(70.0, 0.0))]["vis"], "%.1f")
+    dat("gVisMong", a3[K(station=(70.0, 0.0))]["vis"], "%.2f")
     dat("gVisDay", a3[K(station=(15.0, 0.0))]["vis"], "%.1f")
     # ⛔ DOI CHUNG KHOP TAM NHIN. Doi chung cu so 70 do voi 15 do, va o cap do SAN va so
     #    ung vien di NGUOC chieu nhau — dung ra lai HO TRO gia thuyet khan hiem chu khong
     #    bac no. Cap dung la chom THUA NHAT tren truc mat do: no thay xap xi cung so ung
     #    vien nhu 70 do ma san nho hon mot bac do lon.
     _thua = a3[K(n_planes=6, sats_per_plane=6)]
-    dat("gSanThuaVis", _thua["vis"], "%.1f")
+    dat("gSanThuaVis", _thua["vis"], "%.2f")
+    # ⛔ KHOANG TIN CAY cho CA HAI so ung vien. Bai viet "statistically the same count" ma
+    #    KHONG co khoang nao, va doc ngoai vong 4 bat dung cho ay: 1,70 so 1,45 la lech 17%.
+    #    Do ra thi hai khoang CHAM BIEN nhau chu khong trung nhau, nen cau "nhu nhau" la sai.
+    #    Doi chung van dung, nhung phai phat bieu bang so do chu khong bang mot tu.
+    dat("gVisMongKtc", _ktc_cum([y for y in of_hang
+                                 if y["che_do"] == K(station=(70.0, 0.0))
+                                 and y["vai"] == "test"
+                                 and y["chinh_sach"] == a3[K(station=(70.0, 0.0))]["cau_hinh"]],
+                                "vis_per_slot"), "%.2f")
+    dat("gSanThuaVisKtc", _ktc_cum([y for y in of_hang
+                                    if y["che_do"] == K(n_planes=6, sats_per_plane=6)
+                                    and y["vai"] == "test"
+                                    and y["chinh_sach"] == _thua["cau_hinh"]],
+                                   "vis_per_slot"), "%.2f")
     dat("gSanThuaSan", _thua["gia"], "%.3f")
-    dat("gSanThuaTi", a3[K(station=(70.0, 0.0))]["gia"] / _thua["gia"], "%.1f")
+    # ⛔ CUNG LOI: ban cu cho 10,5 o do chinh xac day du, con 0,103/0,010 cho 10,3.
+    dat("gSanThuaTi", _ti3_tron(a3[K(station=(70.0, 0.0))]["gia"], _thua["gia"]), "%.1f")
     # Ti san tren chinh truc vi do, de khong con noi "san GIU nguyen".
     dat("gSanViDoTi", a3[K(station=(70.0, 0.0))]["gia"]
                       / a3[K(station=(15.0, 0.0))]["gia"], "%.1f")
@@ -1321,6 +1347,11 @@ def sinh_macro(a3, cs, m2_a3, m2_cs, of_hang, ten_tep, so_hinh_ve):
     # --- hien vat: SHA kho cong khai, so hinh, so bang. ⛔ Ba con so nay TUNG bi go tay o
     #     ban dau, va mot trong ba (SHA) doi moi lan day kho, nen go tay la bao dam sai.
     dat("qBang", len(BANG), "%d")
+    # ⛔ "On the twenty works verified for this paper" la mot con so GO TAY, va no da lech
+    #    hai lan: danh sach de xuat len 17 va bang doi chieu len 12 hang. Nay no la phep dem.
+    _bdc = io.open(os.path.join(TAB, "tab-doi-chieu.tex"), encoding="utf-8").read() \
+        if os.path.exists(os.path.join(TAB, "tab-doi-chieu.tex")) else ""
+    dat("qHangDoiChieu", len(re.findall(r"\\citet\{", _bdc)), "%d")
     # So hinh = so hinh ket qua bo sinh nay ve (truyen vao) + so hinh TikZ duoc khai.
     dat("qHinh", so_hinh_ve + len(HINH_TIKZ), "%d")
     # ⛔⛔ DUONG DAN CO DINH `GOC/repo-goc` lam BO SINH DUNG trong mot clone sach, vi o

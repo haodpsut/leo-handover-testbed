@@ -102,7 +102,10 @@ def cham(thu=None, tep_submit=None):
              ("lan: %s" % ban) if ban else "%d tep sach" % len(ds))
         # ---- T5 goi co du hien vat Elsevier doi ----
         can = {"manuscript": r"manuscript.*\.pdf$", "cover letter": r"cover-letter.*\.pdf$",
-               "highlights": r"highlights.*\.(pdf|tex)$", "source": r"source.*\.zip$"}
+               "source": r"source.*\.zip$"}
+    # ⛔ `highlights` KHONG con la hien vat bat buoc: no la yeu cau cua Elsevier, va bai nay
+    #    nay nham Springer. Cong doi mot hien vat noi nhan khong dung la cong doi hien vat
+    #    bai khong can — lop loi da co trong so nha.
         thieu2 = [k for k, rx in can.items() if not any(re.search(rx, f, re.I) for f in ds)]
         kiem(not thieu2, "T5 goi co du hien vat bat buoc",
              ("thieu: %s" % thieu2) if thieu2 else "%d loai" % len(can))

@@ -166,10 +166,15 @@ def cham(tep=None):
             pdf = fitz.open(_pp)
             intr = "\n".join(pdf[i].get_text() for i in range(pdf.page_count))
             so_trang = pdf.page_count
+            # ⛔ Lay kho trang NGAY O DAY, tu ban B1 vua dung trong thu muc tam. Ban dau B24
+            #    doc `paper/main.pdf` tren dia, va ca tiem (tra lai letterpaper) LOT vi tep
+            #    tren dia la ban dung TRUOC khi tiem. Day la lan thu ba cung lop loi "cong
+            #    cham nham hien vat" trong bai nay.
+            kho_trang = (pdf[0].rect.width, pdf[0].rect.height)
             pdf.close()
         else:
             kiem(False, "B1b co sinh ra PDF", "khong co main.pdf sau 3 luot pdflatex")
-            intr, so_trang = "", 0
+            intr, so_trang, kho_trang = "", 0, None
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 
@@ -445,6 +450,19 @@ def cham(tep=None):
         kiem(not _xau, "B19 moi o cua bang truc che do khop CSV tinh lai",
              ("lech: %s" % _xau) if _xau else "%d truc khop" % len(_truc))
 
+    # ---- B24 KHO TRANG phai la A4 ----
+    # ⛔⛔ Ban nop Ad Hoc Networks la kho **LETTER** (612x792pt) vi `elsarticle` mac dinh
+    #    letterpaper va khong ai khai `a4paper`. Khong mot cong nao trong 23 phep hoi den kho
+    #    trang: cong doc LOG LaTeX va doc VAN BAN, con kho trang chi thay khi DO tren PDF.
+    #    Day la ho cua lop loi "cong khong thay duoc thu dap vao mat" trong so nha.
+    if kho_trang:
+        _w, _h = kho_trang
+        kiem(abs(_w - 595.276) < 2 and abs(_h - 841.89) < 2, "B24 kho trang la A4",
+             "%.1f x %.1f pt (%.0f x %.0f mm)"
+             % (_w, _h, _w * 25.4 / 72, _h * 25.4 / 72))
+    else:
+        chu_y("B24 khong do duoc kho trang: ban dung khong ra PDF")
+
     # ---- B23 KHONG VIET SO DO BANG CHU ----
     # ⛔⛔ Ca ba phan bien bat cung mot cho: chu thich Hinh 5 ghi "A nineteenfold change" trong
     #    khi moi cho khac dung `\gMatDoTiVis` = 16,1. No LOT qua phep B6 vi B6 tim CHU SO,
@@ -506,18 +524,33 @@ def cham(tep=None):
     # ---- B20 TI SO IN RA phai bang ti so CUA CAC SO IN RA ----
     # ⛔ Bai in 2,91 va 0,32 roi in ti so 9,2; nguoi doc chia tay ra 9,1. Mot so khong kiem
     #    lai duoc tu chinh trang giay la mot so khong kiem duoc.
-    _ts = [("gLatPolarRatio", "gLatPolar", "gLatLow"),
-           ("gCostRatio", "gCostHigh", "gCostLow"),
-           ("gFadeZeroTi", "gFadeZeroFloor", "gFadeZero")]
+    # ⛔⛔ DANH SACH NAY TUNG CHI CO BA MUC, va doc ngoai vong 4 tim ra HAI ti so khac
+    #    pha cam ket cua §4.2: `gSanThuaTi` in 10,5 trong khi 0,103/0,010 cho 10,3; va
+    #    `gLatGiamTuDinh` in 12 trong khi (0,171-0,149)/0,171 cho 13. Mot phep kiem chi canh
+    #    ba ti so trong khi bai in nhieu hon ba la mot phep kiem co vung mu, va vung mu ay
+    #    da duoc dung den. Nay LIET KE DU, va moi ti so moi phai vao day.
+    # ⛔ HE SO phai KHAI, khong suy tu TEN. Ban cu dung `100.0 if _r.endswith("Ti")`, nen
+    #    `gSanThuaTi` (mot ti so tran) bi nhan 100 va cong bao lech 1030 tren mot con so DUNG.
+    #    Suy quy uoc tu ten macro la do mot DAI DIEN thay vi do ban chat.
+    _ts = [("gLatPolarRatio", "gLatPolar", "gLatLow", 1),
+           ("gCostRatio", "gCostHigh", "gCostLow", 1),
+           ("gFadeZeroTi", "gFadeZeroFloor", "gFadeZero", 100),
+           ("gSanThuaTi", "gSanLonNhatMong", "gSanThuaSan", 1),
+           ("gSanViDoTi", "gSanLonNhatMong", "gSanNhoNhatDay", 1),
+           ("gChurnTi", "gChurnPolar", "gChurnThua", 1),
+           ("gLatTiTuyetDoi", "gLatPolarTuyetDoi", "gLatLowTuyetDoi", 1),
+           ("gSanTiLatPolar", "gSanLonNhatMong", "gLatPolar", 100),
+           ("gSanTiLatLow", "gSanNhoNhatDay", "gLatLow", 100),
+           ("gTiPhaDinh", "gFadeMid", "gFadeZero", 1),
+           ("gAaXauTi", "gAaXauAa", "gAaXauGap", 1)]
     _xau2 = []
-    for _r, _tu, _mau in _ts:
+    for _r, _tu, _mau, _k in _ts:
         if not all(k in mac for k in (_r, _tu, _mau)):
             continue
         # ⛔⛔ BAN DAU PHEP NAY HOI "ti so co nam trong DAI lam tron khong". Phep tiem chung
         #    minh no YEU: dai cua 2,91/0,32 la [8,94; 9,25], nen con so SAI 9,2 van lot, dung
         #    cai so phan bien ngoai bat. Mot dieu kien CAN khong thay duoc dieu kien DU. Nay
         #    hoi dung cai doc gia lam: chia hai so in ra, lam tron ve do chinh xac cua ti so.
-        _k = 100.0 if _r.endswith("Ti") else 1.0
         _n = len(mac[_r].split(".")[-1]) if "." in mac[_r] else 0
         _mong = "%.*f" % (_n, round(_k * float(mac[_tu]) / float(mac[_mau]), _n))
         if mac[_r] != _mong:

@@ -138,6 +138,10 @@ def tinh_lai():
     FADE = lambda v: "neo" if v == 2.5 else "fading_db=%.1f" % v         # noqa: E731
     DEN = lambda k: "neo" if k == 18 else "n_planes=%d+sats_per_plane=%d" % (k, k)   # noqa: E731
 
+    # Ti so tu gia tri DA LAM TRON 3 chu so, quy uoc §4.2. Dat o DAU ham vi nhieu khoi dung.
+    def _r3(a_, b_):
+        return round(float("%.3f" % a_) / float("%.3f" % b_), 1)
+
     R = {}
     def d(ten, gt, dd="%.2f", mo="", src=None):
         # src = (csv, cot, filter, agg) cho nhung dai luong DIEN DAT DUOC bang loc+gop, de
@@ -183,6 +187,10 @@ def tinh_lai():
     d("gHysDich", ", ".join("%g" % A[COST(c)]["hys"] for c in (0.25, 0.5, 1., 2., 4.)), "%s")
     d("gHysCostLo", A[COST(0.25)]["hys"], "%g"); d("gHysCostHi", A[COST(4.0)]["hys"], "%g")
     d("gCostTiQuet", round(4.0 / 0.25), "%d")
+    _p_bdc = os.path.join(RES, "tables", "tab-doi-chieu.tex")
+    d("qHangDoiChieu",
+      len(re.findall(r"\\citet\{", io.open(_p_bdc, encoding="utf-8").read()))
+      if os.path.exists(_p_bdc) else 0, "%d")
     _ts = sorted({A[c]["ttt"] for c in A})
     d("qTsaoTap", ", ".join("%d" % q for q in _ts), "%s")
     d("qTsaoMot", "yes" if _ts == [1] else "no", "%s")
@@ -248,7 +256,13 @@ def tinh_lai():
       sum((a - mx) * (b - my) for a, b in zip(xs, ys))
       / math.sqrt(sum((a - mx) ** 2 for a in xs) * sum((b - my) ** 2 for b in ys)), "%.2f")
     d("gSanLonNhatMong", A[LAT(70.0)]["gia"], "%.3f"); d("gSanNhoNhatDay", A[LAT(15.0)]["gia"], "%.3f")
-    d("gVisMong", A[LAT(70.0)]["vis"], "%.1f"); d("gVisDay", A[LAT(15.0)]["vis"], "%.1f")
+    d("gVisMong", A[LAT(70.0)]["vis"], "%.2f"); d("gVisDay", A[LAT(15.0)]["vis"], "%.1f")
+    # KTC cho CA HAI so ung vien cua cap doi chung khop tam nhin: bai tung viet
+    # "statistically the same count" ma khong co khoang nao.
+    d("gVisMongKtc", ktc_cum(g[(LAT(70.0), "test")][A[LAT(70.0)]["cau_hinh"]],
+                             "vis_per_slot"), "%.2f")
+    d("gSanThuaVisKtc", ktc_cum(g[(DEN(6), "test")][A[DEN(6)]["cau_hinh"]],
+                               "vis_per_slot"), "%.2f")
 
     # ---------- KHOANG TIN CAY, cum theo hinh hoc ----------
     d("qHinhHoc", neo["hinh"], "%d", "so hinh hoc moi vai, dem tu cot kinh_do")
@@ -259,28 +273,29 @@ def tinh_lai():
     d("gCostHighKtc", A[COST(4.0)]["ktc"], "%.2f")
 
     # ---------- doi chung KHOP TAM NHIN cho san ----------
-    d("gSanThuaVis", A[DEN(6)]["vis"], "%.1f")
+    d("gSanThuaVis", A[DEN(6)]["vis"], "%.2f")
     d("gSanThuaSan", A[DEN(6)]["gia"], "%.3f")
-    d("gSanThuaTi", A[LAT(70.0)]["gia"] / A[DEN(6)]["gia"], "%.1f")
+    # ⛔ Tu SO IN RA: 0,103/0,010 = 10,3, khong phai 10,5 o do chinh xac day du.
+    d("gSanThuaTi", _r3(A[LAT(70.0)]["gia"], A[DEN(6)]["gia"]), "%.1f")
     d("gSanViDoTi", A[LAT(70.0)]["gia"] / A[LAT(15.0)]["gia"], "%.1f")
     d("gSanTiLatLow", 100.0 * A[LAT(15.0)]["gia"] / A[LAT(15.0)]["gap"], "%.1f")
     d("gSanTiLatPolar", 100.0 * A[LAT(70.0)]["gia"] / A[LAT(70.0)]["gap"], "%.1f")
     fd = [A[FADE(v)]["gap"] for v in (0., 1., 2.5, 4., 6.)]
-    d("gTiPhaDinh", round(float("%.2f" % max(fd)) / float("%.2f" % min(fd)), 1), "%.1f")
+    # ⛔ Mau so in o BA chu so, tu so o HAI. Lam tron TUNG cai theo do chinh xac no IN.
+    d("gTiPhaDinh", round(float("%.2f" % max(fd)) / float("%.3f" % min(fd)), 1), "%.1f")
 
     # ---------- THANG TUYET DOI, LUAN CHUYEN, A2/A4 ----------
     # ⛔ Cai dat RIENG: ti so lay tu gia tri DA LAM TRON (quy uoc §4.2), va thang tuyet doi
     #    chia cho SO KHE vi S = 1800/delta nen tong khong so duoc doc truc do dai khe.
-    def _r3(a_, b_):
-        return round(float("%.3f" % a_) / float("%.3f" % b_), 1)
     _vd = [(v, A[LAT(v)]) for v in (0., 15., 30., 45., 60., 70.)]
     _dinh = max(_vd, key=lambda z: z[1]["tdk"])
     d("gLatDinhViDo", _dinh[0], "%g")
     d("gLatDinhTuyetDoi", _dinh[1]["tdk"], "%.3f")
     d("gLatLowTuyetDoi", A[LAT(15.0)]["tdk"], "%.3f")
     d("gLatPolarTuyetDoi", A[LAT(70.0)]["tdk"], "%.3f")
-    d("gLatGiamTuDinh",
-      100.0 * (_dinh[1]["tdk"] - A[LAT(70.0)]["tdk"]) / _dinh[1]["tdk"], "%.0f")
+    # ⛔ Tu SO IN RA: 0,171 va 0,149 cho 13, khong phai 12 o do chinh xac day du.
+    _din = float("%.3f" % _dinh[1]["tdk"]); _pin = float("%.3f" % A[LAT(70.0)]["tdk"])
+    d("gLatGiamTuDinh", 100.0 * (_din - _pin) / _din, "%.0f")
     d("gLatTiTuyetDoi", _r3(A[LAT(70.0)]["tdk"], A[LAT(15.0)]["tdk"]), "%.1f")
     d("gLatTiMauSo", round(float("%.2f" % abs(A[LAT(15.0)]["jopt"]))
                            / float("%.2f" % abs(A[LAT(70.0)]["jopt"])), 1), "%.1f")
