@@ -204,7 +204,14 @@ def main():
         for f in sorted(os.listdir(md)):
             if f.endswith(".tex"):
                 s = io.open(os.path.join(md, f), encoding="utf-8").read()
-                nhan_md |= set(re.findall(r"\\begin\{proposition\}[^\n]*\n\\label\{(prop:[^}]+)\}", s))
+                # ⛔ Quet CA `remark`. Ngay 16/10 phep phan ra bi ha tu Proposition xuong
+                #    Remark (no la dong nhat thuc dai so, de o cho de thay nhat la dat sai
+                #    trong tam). Cong chi quet `proposition` nen no mat dau tuyen bo VA van
+                #    giu phep do, roi bao "co phep do cho menh de khong con trong bai" — mot
+                #    canh bao dung ve hinh thuc nhung sai ve y: tuyen bo van o trong bai, chi
+                #    doi nhan. Cong phai theo TUYEN BO, khong theo ten moi truong LaTeX.
+                nhan_md |= set(re.findall(
+                    r"\\begin\{(?:proposition|remark)\}[^\n]*\n\\label\{(prop:[^}]+)\}", s))
     do_duoc = {}
     nen = co.get("vps-ofat") or []
     if nen:

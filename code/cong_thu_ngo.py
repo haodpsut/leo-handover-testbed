@@ -111,6 +111,14 @@ def cham(thu=None, tep_submit=None):
     return loi
 
 
+def _tu_macro_nDeXuat():
+    """Tra ve DUNG chuoi ma `\\nDeXuat` dang phat, de ca tiem neo vao macro chu khong go tay."""
+    p_ = os.path.join(GOC, "results", "so-van-lieu.tex")
+    m_ = re.search(r"\\newcommand\{\\nDeXuat\}\{([^}]*)\}", doc(p_))
+    assert m_, "⛔ khong doc duoc macro nDeXuat, ca tiem T3 khong neo duoc"
+    return m_.group(1)
+
+
 def tu_kiem():
     goc = doc(os.path.join(PAPER, "thu-ngo.tex"))
     ds = sorted(os.path.relpath(p, SUBMIT) for p in
@@ -130,10 +138,12 @@ def tu_kiem():
         ("T2: de lai so bai DA RUT trong thu",
          lambda: (goc.replace("FAIR 2026", "FAIR 2026, paper 1571332169"), ds or None)),
         ("T3: doi so bai de xuat trong thu cho lech macro",
-         # ⛔ Neo cu la "sixteen such proposals", nhung trong thu cum ay BI NGAT DONG nen
-         #    phep thay khong khop va ca tiem thanh VO NGHIA. Khung tiem bat duoc dieu do
-         #    (no doi "ca phai LAM DOI mot cai gi"), nhung neo van phai sua cho dung.
-         lambda: (goc.replace("sixteen", "nine"), ds or None)),
+         # ⛔⛔ NEO PHAI LAY TU MACRO, khong go chu. Neo cu la chuoi "sixteen"; ngay 16/10
+         #    danh sach de xuat len 17 nen thu doi thanh "seventeen" va phep thay tro thanh
+         #    VO NGHIA — ca tiem khong doi gi ma van duoc dem la mot ca. Day la lan thu HAI
+         #    cung lop loi trong mot tuan (lan truoc o cong_bai B22). Nay neo doc chinh
+         #    `\nDeXuat` nen no khong the lac hau duoc nua.
+         lambda: (goc.replace(_tu_macro_nDeXuat(), "nine"), ds or None)),
         ("T4: nhet mot ghi chu noi bo vao goi",
          lambda: (goc, (ds or []) + ["TRANG-THAI.md"])),
         ("T5: bo thu ngo khoi goi",

@@ -558,6 +558,17 @@ def tu_kiem():
         os.path.exists(KHOA) and os.remove(KHOA)
 
 
+def _dai_mot_gach(goc, hl):
+    """Noi dai gach highlight DAU TIEN cho vuot nguong, neo lay tu chinh tep."""
+    d = dict(goc)
+    m = re.search(r"\\item .+", d[hl])
+    assert m, "⛔ khong thay gach \\item nao trong frag-highlights.tex"
+    cu = m.group(0)
+    d[hl] = d[hl].replace(cu, cu.rstrip() + " " + "x" * 90, 1)
+    assert d[hl] != goc[hl], "⛔ ca tiem B10b khong lam doi gi"
+    return d
+
+
 def _tu_kiem():
     # ⛔ Danh sach nay PHAI trung danh sach trong `cham()`. Lan dau no thieu fig-luong.tex va
     #    alg-dp.tex nen ban GOC cua phep tiem tu HONG (B13c, B14), tuc khung tiem bao dong gia
@@ -588,10 +599,11 @@ def _tu_kiem():
          lambda: doi(kq, r"\gNeoVis{} satellites are", r"\gKhongTonTai{} satellites are")),
         ("B6: go mot chu so vao cau ket qua",
          lambda: doi(kq, "The more useful number", "The 42 more useful number")),
-        ("B10b: lam mot highlight dai hon 85 ky tu",
-         lambda: doi(hl, r"\item Learned policies beat tuned A3 in no regime cell once geometry noise is sized",
-                     r"\item Learned policies beat the tuned standard A3 mechanism in no single "
-                     r"regime cell at all once the geometry sampling noise has been sized properly")),
+        # ⛔⛔ NEO KHONG DUOC GO TAY. Ban cu neo vao nguyen van mot gach highlight; ngay 16/10
+        #    toi viet lai cac gach va ca tiem no tung `AssertionError` giua bo tiem. Khung
+        #    tiem bao loi on ao la DUNG (xem feedback-ca-tiem-sua-nua...), nhung neo thi phai
+        #    tu tep: lay gach DAU TIEN dang co va noi dai no ra. Khong the lac hau duoc nua.
+        ("B10b: lam mot highlight dai hon 85 ky tu", lambda: _dai_mot_gach(goc, hl)),
         ("B9: lam abstract dai hon %d tu" % ABS_MAX,
          lambda: doi(mt, r"\end{abstract}", ("x " * 120) + "\n\\end{abstract}")),
         # ⛔ Phai bo eqref cua phuong trinh chi duoc dan DUNG MOT LAN, va thay bang mot thu

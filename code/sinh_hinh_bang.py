@@ -815,6 +815,11 @@ def b_doi_chieu(ten_tep):
         ("\\citet{chou2026ddqn}", [N, N, N, N]),
         ("\\citet{lee2023dho}", [N, N, N, N]),
         ("\\citet{hozayen2022}", [N, N, N, N]),
+        # ⛔ Hai hang THEM 16/10 sau khi doc ngoai va phan bien chuyen nganh neu thieu. Ca hai
+        #    da tu giai duoc ma (arXiv 2512.02449v3 va doi 10.1109/OJCOMS.2025.3541962), nen
+        #    duoc dan; bai nao chua giai duoc ma thi KHONG dan, theo luat nha.
+        ("\\citet{mcbain2026ergodic}", [Y, N, N, N]),
+        ("\\citet{eydian2025bipartite}", [N, Y, N, N]),
         ("\\citet{hossain2026satlock}", [Y, N, N, N]),
         ("\\citet{namyar2022}", [Y, N, P, N]),
         ("This paper", [Y, Y, Y, Y]),
