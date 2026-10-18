@@ -93,6 +93,14 @@ def DANH_SACH_NGUON():
 
 
 def cham(tep=None):
+    # ⛔⛔ KHOA chan CA luot cham thuong. Phep B17 chay bo sinh, tuc luot cham
+    #    thuong CUNG GHI results/so-lieu.tex, hinh va bang. Chay no trong khi bo
+    #    tiem dang sua bo sinh roi dung lai tu ban luu rieng la hai tien trinh cung
+    #    ghi mot hien vat — lop loi ay da xoa mot ban va cua toi hom 16/10, va 18/10
+    #    toi lai lam dung the. Khoa phai tu biet chan.
+    if os.path.exists(KHOA) and os.environ.get("TRONG_BO_TIEM") != "1":
+        sys.exit("⛔ bo tiem DANG CHAY (%s). Luot cham thuong cung ghi hien vat; "
+                 "doi no xong." % io.open(KHOA).read().strip())
     """tep: {duong_dan: noi_dung} de phep tiem thay noi dung ma khong ghi dia."""
     loi, luu = [], []
 
@@ -585,6 +593,7 @@ def tu_kiem():
         sys.exit("⛔ bo tiem DANG CHAY o mot tien trinh khac (%s). Khong chay hai ban mot luc: "
                  "ca hai cung sua va cung dung lai `sinh_hinh_bang.py`." % io.open(KHOA).read().strip())
     io.open(KHOA, "w", encoding="utf-8").write("pid %d, %s\n" % (os.getpid(), __file__))
+    os.environ["TRONG_BO_TIEM"] = "1"
     try:
         return _tu_kiem()
     finally:

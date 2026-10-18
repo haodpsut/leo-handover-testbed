@@ -34,7 +34,10 @@
 % ⛔ Toi da tu HA \ruleW xuong 1,4pt trong khi mac dinh cua nha la 1,6pt, roi lai than
 %    hinh thua muc. Tra ve chuan nha va nhich len mot chut: vai dam hon thi vua dam hon
 %    o ban xam, vua dua mat do muc qua san, va khong doi mot chu nao trong hinh.
-\def\ruleW{2.0pt}\def\cardStroke{0.7pt}\def\cardW{25mm}
+% ⛔ `cardW` 25mm cho hinh rong 253,3pt, trong khi COT cua khuon hai cot do duoc dung
+%    252,0pt — du 1,3pt va LaTeX bao tran. Thu nho the 0,3mm thay vi CO ANH, vi luat
+%    nha la dat artwork khong scale: co anh lam co chu trong hinh lech khoi co chu bai.
+\def\ruleW{2.0pt}\def\cardStroke{0.7pt}\def\cardW{24.3mm}
 \input{../../repo-goc/style/palette.tex}
 
 \begin{document}
