@@ -458,6 +458,25 @@ def cham(tep=None):
         kiem(not _xau, "B19 moi o cua bang truc che do khop CSV tinh lai",
              ("lech: %s" % _xau) if _xau else "%d truc khop" % len(_truc))
 
+    # ---- B25 TAG bai dan phai la tag THAT trong kho ----
+    # ⛔⛔ Bai dan mot tag git. De cho ngat dong trong cot hep, chuoi tag bi chen
+    #    `\discretionary` vao giua — va the la moi lenh `sed`/`grep` tren chuoi ay TRUOT
+    #    IM LANG. Toi vua doi tag tu -10-16 sang -10-18 va phep thay khong khop gi ca,
+    #    khong bao loi. Phep nay doc TRANG IN (da bo moi lenh LaTeX) roi so voi `git tag`,
+    #    nen cach chuoi bi cat trong nguon khong con giau duoc no.
+    # ⛔ Chuoi tag NGAT DONG trong cot hep ("tcs-submission-\n2026-10-18"), nen phai bo
+    #    khoang trang truoc khi khop. Ban dau toi quen, va cong bao "bai khong dan tag" tren
+    #    mot bai CO dan — bao dong gia tren chinh phep kiem vua viet de chong bao dong gia.
+    _phang = re.sub(r"[\s\u00ad]+", "", intr)
+    _tag_bai = set(re.findall(r"tcs-submission-\d{4}-\d{2}-\d{2}", _phang))
+    _r_tag = subprocess.run(["git", "-C", os.path.join(GOC, "repo-goc"), "tag", "--points-at",
+                             "HEAD"], capture_output=True, text=True)
+    _tag_kho = {x for x in _r_tag.stdout.split() if x.startswith("tcs-submission-")}
+    if _tag_bai or _tag_kho:
+        kiem(bool(_tag_bai) and _tag_bai <= _tag_kho,
+             "B25 tag bai dan la tag that tren HEAD cua kho",
+             "bai: %s | kho: %s" % (sorted(_tag_bai) or "khong dan", sorted(_tag_kho) or "khong co"))
+
     # ---- B24 KHO TRANG phai la A4 ----
     # ⛔⛔ Ban nop Ad Hoc Networks la kho **LETTER** (612x792pt) vi `elsarticle` mac dinh
     #    letterpaper va khong ai khai `a4paper`. Khong mot cong nao trong 23 phep hoi den kho
